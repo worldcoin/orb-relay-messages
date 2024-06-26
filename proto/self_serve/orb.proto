@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package selfserve;
+
+message OrbStartSelfServeSignupCommand {}
+
+message OrbSelfServeSessionStartedEvent {
+  string app_id = 1;
+}
+
+message OrbSignupStartedEvent {
+  string app_id = 1;
+}
+
+message OrbSignupCompletedEvent {
+  string app_id = 1;
+  bool success = 2;
+}

@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package relay;
+
+import "config/backend.proto";
+import "config/orb.proto";
+import "self_serve/app.proto";
+import "self_serve/orb.proto";
+
+// Service Definitions
+service OrbService {
+  rpc OrbConnect(stream OrbEvent) returns (stream OrbCommand);
+}
+
+service AppService {
+  rpc AppConnect(stream AppEvent) returns (stream AppCommand);
+}
+
+service BackendService {
+  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
+}
+
+message OrbConnectRequestEvent {
+  string orb_id = 1;
+}
+
+message AppConnectRequestEvent {
+  string app_id = 1;
+}
+
+// Command and Event Streams
+message OrbCommand {
+  oneof command {
+    selfserve.OrbStartSelfServeSignupCommand orb_start_self_serve_signup_command = 1;
+    config.OrbReceiveConfigUpdate orb_receive_config_update = 2;
+  }
+}
+
+message OrbEvent {
+  oneof event {
+    OrbConnectRequestEvent orb_connect_request_event = 1;
+    selfserve.OrbSelfServeSessionStartedEvent orb_self_serve_session_started_event = 2;
+    selfserve.OrbSignupStartedEvent orb_signup_started_event = 3;
+    selfserve.OrbSignupCompletedEvent orb_signup_completed_event = 4;
+  }
+}
+
+message AppCommand {
+  oneof command {
+    selfserve.AppReceiveQRCommand app_receive_qr_command = 1;
+    selfserve.AppConnectedToOrbCommand app_connected_to_orb_command = 2;
+    selfserve.NotifyAppSignupStartedCommand notify_app_signup_started_command = 3;
+    selfserve.AppReceiveSignupResultCommand app_receive_signup_result_command = 4;
+    selfserve.AppShowStartSignupButtonCommand app_show_start_signup_button_command = 5;
+  }
+}
+
+message AppEvent {
+  oneof event {
+    AppConnectRequestEvent app_connect_request_event = 1;
+    selfserve.AppRequestStartSelfServeFlowEvent app_request_start_self_serve_flow_event = 2;
+    selfserve.AppRequestStartSignupEvent app_request_start_signup_event = 3;
+  }
+}
+
+message BackendEvent {
+  oneof event {
+    config.OrbUpdateConfigRequest orb_update_config_request = 1;
+  }
+}
+
+message BackendCommand {
+  oneof command {
+    config.OrbUpdateConfigResponse orb_update_config_response = 1;
+  }
+}

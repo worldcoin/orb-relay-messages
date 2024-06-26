@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package selfserve;
+
+message AppReceiveQRCommand {
+  string qr_code = 1;
+}
+
+message AppConnectedToOrbCommand {
+  string orb_id = 1;
+}
+
+message AppShowStartSignupButtonCommand {}
+
+message NotifyAppSignupStartedCommand {}
+
+message AppReceiveSignupResultCommand {
+  bool success = 1;
+}
+
+message AppRequestStartSelfServeFlowEvent {}
+
+message AppRequestStartSignupEvent {
+  string orb_id = 1;
+}

@@ -1,0 +1,5 @@
+syntax = "proto3";
+
+package selfserve;
+
+// Backend-specific messages would go here
