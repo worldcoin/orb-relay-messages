@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package config;
+
+message OrbUpdateConfigRequest {
+  string orb_id = 1;
+  string config = 2;
+}
+
+message OrbUpdateConfigResponse {
+  string orb_id = 1;
+  bool success = 2;
+}
