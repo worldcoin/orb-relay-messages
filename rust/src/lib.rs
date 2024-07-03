@@ -1,4 +1,5 @@
 pub use ::prost;
+pub use ::tonic;
 
 pub mod relay {
     tonic::include_proto!("relay");
