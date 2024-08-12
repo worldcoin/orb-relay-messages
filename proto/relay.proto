@@ -9,15 +9,33 @@ import "self_serve/orb.proto";
 
 // Service Definitions
 service OrbService {
-  rpc OrbConnect(stream OrbEvent) returns (stream OrbCommand);
+  rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
 }
 
 service AppService {
-  rpc AppConnect(stream AppEvent) returns (stream AppCommand);
+  rpc AppConnect(stream RelayMessage) returns (stream RelayMessage);
 }
 
 service BackendService {
   rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
+}
+
+message RelayPayload {
+  oneof payload {
+    OrbConnectRequestEvent orb_connect_request_event = 1;
+    AppConnectRequestEvent app_connect_request_event = 2;
+    OrbCommand orb_command = 3;
+    OrbEvent orb_event = 4;
+    AppCommand app_command = 5;
+    AppEvent app_event = 6;
+    BackendEvent backend_event = 7;
+    BackendCommand backend_command = 8;
+  }
+}
+
+message RelayMessage {
+  string destination = 1;
+  RelayPayload payload = 2;
 }
 
 message OrbConnectRequestEvent {

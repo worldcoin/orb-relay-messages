@@ -6,9 +6,7 @@ message AppReceiveQRCommand {
   string qr_code = 1;
 }
 
-message AppConnectedToOrbCommand {
-  string orb_id = 1;
-}
+message AppConnectedToOrbCommand {}
 
 message AppShowStartSignupButtonCommand {}
 
@@ -20,6 +18,4 @@ message AppReceiveSignupResultCommand {
 
 message AppRequestStartSelfServeFlowEvent {}
 
-message AppRequestStartSignupEvent {
-  string orb_id = 1;
-}
+message AppRequestStartSignupEvent {}
