@@ -4,15 +4,10 @@ package selfserve;
 
 message OrbStartSelfServeSignupCommand {}
 
-message OrbSelfServeSessionStartedEvent {
-  string app_id = 1;
-}
+message OrbSelfServeSessionStartedEvent {}
 
-message OrbSignupStartedEvent {
-  string app_id = 1;
-}
+message OrbSignupStartedEvent {}
 
 message OrbSignupCompletedEvent {
-  string app_id = 1;
-  bool success = 2;
+  bool success = 1;
 }
