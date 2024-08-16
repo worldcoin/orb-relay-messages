@@ -34,8 +34,9 @@ message RelayPayload {
 }
 
 message RelayMessage {
-  string destination = 1;
-  RelayPayload payload = 2;
+  string src = 1;
+  string dst = 2;
+  RelayPayload payload = 3;
 }
 
 message OrbConnectRequestEvent {
