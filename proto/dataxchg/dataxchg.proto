@@ -9,20 +9,10 @@ enum DataSource {
   DATA_SOURCE_UNDEFINED = 0;
   LATEST_SCAN_IMAGE = 1;
   ORB_CONFIG = 2;
-  DATA_SOURCE_UNDEFINED = 0;
-  LATEST_SCAN_IMAGE = 1;
-  ORB_CONFIG = 2;
 }
 
 // binary format of source data
 enum DataFormat {
-  DATA_FORMAT_UNDEFINED = 0;
-  JSON = 1;
-  CSV = 2;
-  PNG = 3;
-  JPEG = 4;
-  TEXT = 5;
-  RAW = 6;
   DATA_FORMAT_UNDEFINED = 0;
   JSON = 1;
   CSV = 2;
@@ -38,19 +28,10 @@ message DataReference {
     DataSource data_source = 1;
     string file_path = 2;
   }
-  oneof source {
-    DataSource data_source = 1;
-    string file_path = 2;
-  }
 }
 
 // Metadata for data source
 message DataSourceMetadata {
-  DataSource source = 1;
-  string file_path = 2;
-  DataFormat format = 3;
-  google.protobuf.Timestamp last_modified = 4;
-  uint32 size = 5;
   DataSource source = 1;
   string file_path = 2;
   DataFormat format = 3;
