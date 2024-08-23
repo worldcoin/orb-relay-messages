@@ -4,6 +4,7 @@ package relay;
 
 import "config/backend.proto";
 import "config/orb.proto";
+import "dataxchg/dataxchg.proto";
 import "self_serve/app.proto";
 import "self_serve/orb.proto";
 
@@ -54,6 +55,7 @@ message OrbCommand {
   oneof command {
     selfserve.OrbStartSelfServeSignupCommand orb_start_self_serve_signup_command = 1;
     config.OrbReceiveConfigUpdate orb_receive_config_update = 2;
+    dataxchg.OrbRelayDataExchangePull orb_relay_data_exchange_pull = 3;
   }
 }
 
@@ -63,6 +65,7 @@ message OrbEvent {
     selfserve.OrbSelfServeSessionStartedEvent orb_self_serve_session_started_event = 2;
     selfserve.OrbSignupStartedEvent orb_signup_started_event = 3;
     selfserve.OrbSignupCompletedEvent orb_signup_completed_event = 4;
+    dataxchg.OrbRelayDataExchangePush orb_relay_data_exchange_push = 5;
   }
 }
 
@@ -73,6 +76,7 @@ message AppCommand {
     selfserve.NotifyAppSignupStartedCommand notify_app_signup_started_command = 3;
     selfserve.AppReceiveSignupResultCommand app_receive_signup_result_command = 4;
     selfserve.AppShowStartSignupButtonCommand app_show_start_signup_button_command = 5;
+    dataxchg.OrbRelayDataExchangePull orb_relay_data_exchange_pull = 6;
   }
 }
 
@@ -81,17 +85,20 @@ message AppEvent {
     AppConnectRequestEvent app_connect_request_event = 1;
     selfserve.AppRequestStartSelfServeFlowEvent app_request_start_self_serve_flow_event = 2;
     selfserve.AppRequestStartSignupEvent app_request_start_signup_event = 3;
+    dataxchg.OrbRelayDataExchangePush orb_relay_data_exchange_push = 4;
   }
 }
 
 message BackendEvent {
   oneof event {
     config.OrbUpdateConfigRequest orb_update_config_request = 1;
+    dataxchg.OrbRelayDataExchangePull orb_relay_data_exchange_pull = 2;
   }
 }
 
 message BackendCommand {
   oneof command {
     config.OrbUpdateConfigResponse orb_update_config_response = 1;
+    dataxchg.OrbRelayDataExchangePush orb_relay_data_exchange_push = 2;
   }
 }

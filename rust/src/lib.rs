@@ -12,3 +12,7 @@ pub mod selfserve {
 pub mod config {
     tonic::include_proto!("config");
 }
+
+pub mod dataxchg {
+    tonic::include_proto!("dataxchg");
+}

@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package dataxchg;
+
+import "google/protobuf/timestamp.proto";
+
+enum DataSource {
+    DATA_SOURCE_UNDEFINED = 0;
+    LATEST_SCAN_IMAGE = 1;
+    ORB_CONFIG = 2;
+}
+
+enum DataFormat {
+    DATA_FORMAT_UNDEFINED = 0;
+    JSON = 1;
+    CSV = 2;
+    PNG = 3;
+    JPEG = 4;
+    TEXT = 5;
+    RAW = 6;
+}
+
+message DataReference {
+    oneof source {
+        DataSource data_source = 1;
+        string file_path = 2;
+    }
+}
+
+message DataSourceMetadata {
+    DataSource source = 1;
+    string file_path = 2;
+    DataFormat format = 3;
+    google.protobuf.Timestamp last_modified = 4;
+    uint32 size = 5;
+}
+
+
+message OrbRelayDataMetadataPull {
+    DataReference reference = 1;
+}
+
+message OrbRelayDataExchangePull {
+    DataReference reference = 1;
+}
+
+message OrbRelayDataMetadataPush {
+    DataSourceMetadata source_metadata = 1;
+}
+
+message OrbRelayDataExchangePush {
+    DataSourceMetadata metadata = 1;
+    bytes data = 2;
+}
+

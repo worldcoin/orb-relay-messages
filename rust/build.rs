@@ -13,6 +13,7 @@ fn main() {
                 "../proto/self_serve/orb.proto",
                 "../proto/config/backend.proto",
                 "../proto/config/orb.proto",
+                "../proto/dataxchg/dataxchg.proto",
             ],
             &["../proto"],
         )

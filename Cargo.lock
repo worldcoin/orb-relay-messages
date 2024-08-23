@@ -487,6 +487,7 @@ name = "orb-relay-messages"
 version = "0.0.0"
 dependencies = [
  "prost",
+ "prost-types",
  "tonic",
  "tonic-build",
 ]
