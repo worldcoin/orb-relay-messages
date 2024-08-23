@@ -4,13 +4,25 @@ package dataxchg;
 
 import "google/protobuf/timestamp.proto";
 
+// Indirect references to specific data sources
 enum DataSource {
+  DATA_SOURCE_UNDEFINED = 0;
+  LATEST_SCAN_IMAGE = 1;
+  ORB_CONFIG = 2;
   DATA_SOURCE_UNDEFINED = 0;
   LATEST_SCAN_IMAGE = 1;
   ORB_CONFIG = 2;
 }
 
+// binary format of source data
 enum DataFormat {
+  DATA_FORMAT_UNDEFINED = 0;
+  JSON = 1;
+  CSV = 2;
+  PNG = 3;
+  JPEG = 4;
+  TEXT = 5;
+  RAW = 6;
   DATA_FORMAT_UNDEFINED = 0;
   JSON = 1;
   CSV = 2;
@@ -20,14 +32,25 @@ enum DataFormat {
   RAW = 6;
 }
 
+// Reference to data source to be exchanged
 message DataReference {
+  oneof source {
+    DataSource data_source = 1;
+    string file_path = 2;
+  }
   oneof source {
     DataSource data_source = 1;
     string file_path = 2;
   }
 }
 
+// Metadata for data source
 message DataSourceMetadata {
+  DataSource source = 1;
+  string file_path = 2;
+  DataFormat format = 3;
+  google.protobuf.Timestamp last_modified = 4;
+  uint32 size = 5;
   DataSource source = 1;
   string file_path = 2;
   DataFormat format = 3;
@@ -35,13 +58,21 @@ message DataSourceMetadata {
   uint32 size = 5;
 }
 
+//
+// Data exchange messages
+//
+
+// Request to pull metadata for a data source
 message OrbRelayDataMetadataPull { DataReference reference = 1; }
 
+// Request to pull full data from a data source
 message OrbRelayDataExchangePull { DataReference reference = 1; }
 
+// Provide metadata for a data source
 message OrbRelayDataMetadataPush { DataSourceMetadata source_metadata = 1; }
 
+// Provide full data from a data source
 message OrbRelayDataExchangePush {
   DataSourceMetadata metadata = 1;
-  bytes data = 2;
+  bytes data = 2; // bytes will be encoded in the format specified in metadata.format
 }
