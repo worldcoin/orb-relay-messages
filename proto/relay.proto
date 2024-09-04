@@ -7,6 +7,18 @@ import "config/orb.proto";
 import "self_serve/app.proto";
 import "self_serve/orb.proto";
 
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  APP = 1;
+  ORB = 2;
+  SERVICE = 3;
+}
+
+message Entity {
+  string id = 1;
+  EntityType entity_type = 2;
+}
+
 // Service Definitions
 service OrbService {
   rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
@@ -30,12 +42,14 @@ message RelayPayload {
     AppEvent app_event = 6;
     BackendEvent backend_event = 7;
     BackendCommand backend_command = 8;
+    Ping ping = 9;
+    Pong pong = 10;
   }
 }
 
 message RelayMessage {
-  string src = 1;
-  string dst = 2;
+  Entity src = 1;
+  Entity dst = 2;
   RelayPayload payload = 3;
 }
 
@@ -47,6 +61,14 @@ message OrbConnectRequestEvent {
 message AppConnectRequestEvent {
   string app_id = 1;
   string auth_token = 2;
+}
+
+message Ping {
+  optional string id = 1;
+}
+
+message Pong {
+  optional string id = 1;
 }
 
 // Command and Event Streams
