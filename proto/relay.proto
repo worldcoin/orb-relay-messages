@@ -34,16 +34,14 @@ service BackendService {
 
 message RelayPayload {
   oneof payload {
-    OrbConnectRequestEvent orb_connect_request_event = 1;
-    AppConnectRequestEvent app_connect_request_event = 2;
-    OrbCommand orb_command = 3;
-    OrbEvent orb_event = 4;
-    AppCommand app_command = 5;
-    AppEvent app_event = 6;
-    BackendEvent backend_event = 7;
-    BackendCommand backend_command = 8;
-    Ping ping = 9;
-    Pong pong = 10;
+    OrbCommand orb_command = 1;
+    OrbEvent orb_event = 2;
+    AppCommand app_command = 3;
+    AppEvent app_event = 4;
+    BackendEvent backend_event = 5;
+    BackendCommand backend_command = 6;
+    Ping ping = 7;
+    Pong pong = 8;
   }
 }
 
