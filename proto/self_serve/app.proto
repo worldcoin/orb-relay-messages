@@ -2,20 +2,20 @@ syntax = "proto3";
 
 package selfserve;
 
-message AppReceiveQRCommand {
+message AppReceiveQR {
   string qr_code = 1;
 }
 
-message AppConnectedToOrbCommand {}
+message AppConnectedToOrb {}
 
-message AppShowStartSignupButtonCommand {}
+message AppShowStartSignupButton {}
 
-message NotifyAppSignupStartedCommand {}
+message NotifyAppSignupStarted {}
 
-message AppReceiveSignupResultCommand {
+message AppReceiveSignupResult {
   bool success = 1;
 }
 
-message AppRequestStartSelfServeFlowEvent {}
+message AppRequestStartSelfServeFlow {}
 
-message AppRequestStartSignupEvent {}
+message AppRequestStartSignup {}
