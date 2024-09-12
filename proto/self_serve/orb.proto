@@ -2,12 +2,12 @@ syntax = "proto3";
 
 package selfserve;
 
-message OrbStartSelfServeSignupCommand {}
+message OrbStartSelfServeSignup {}
 
-message OrbSelfServeSessionStartedEvent {}
+message OrbSelfServeSessionStarted {}
 
-message OrbSignupStartedEvent {}
+message OrbSignupStarted {}
 
-message OrbSignupCompletedEvent {
+message OrbSignupCompleted {
   bool success = 1;
 }

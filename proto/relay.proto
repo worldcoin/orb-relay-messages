@@ -32,35 +32,26 @@ service BackendService {
   rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
 }
 
-message RelayPayload {
-  oneof payload {
-    OrbConnectRequestEvent orb_connect_request_event = 1;
-    AppConnectRequestEvent app_connect_request_event = 2;
-    OrbCommand orb_command = 3;
-    OrbEvent orb_event = 4;
-    AppCommand app_command = 5;
-    AppEvent app_event = 6;
-    BackendEvent backend_event = 7;
-    BackendCommand backend_command = 8;
-    Ping ping = 9;
-    Pong pong = 10;
-  }
-}
-
 message RelayMessage {
   Entity src = 1;
   Entity dst = 2;
   RelayPayload payload = 3;
 }
 
-message OrbConnectRequestEvent {
+message OrbConnectRequest {
   string orb_id = 1;
   string auth_token = 2;
 }
 
-message AppConnectRequestEvent {
+message AppConnectRequest {
   string app_id = 1;
   string auth_token = 2;
+}
+
+message ConnectResponse {
+  string client_id = 1;
+  bool success = 2;
+  string error = 3;
 }
 
 message Ping {
@@ -71,49 +62,30 @@ message Pong {
   optional string id = 1;
 }
 
-// Command and Event Streams
-message OrbCommand {
-  oneof command {
-    selfserve.OrbStartSelfServeSignupCommand orb_start_self_serve_signup_command = 1;
-    config.OrbReceiveConfigUpdate orb_receive_config_update = 2;
-  }
-}
+message RelayPayload {
+  oneof payload {
+    OrbConnectRequest orb_connect_request = 1;
+    AppConnectRequest app_connect_request = 2;
+    ConnectResponse connect_response = 3;
+    Ping ping = 4;
+    Pong pong = 5;
 
-message OrbEvent {
-  oneof event {
-    OrbConnectRequestEvent orb_connect_request_event = 1;
-    selfserve.OrbSelfServeSessionStartedEvent orb_self_serve_session_started_event = 2;
-    selfserve.OrbSignupStartedEvent orb_signup_started_event = 3;
-    selfserve.OrbSignupCompletedEvent orb_signup_completed_event = 4;
-  }
-}
+    // Config Payloads
+    config.OrbReceiveConfigUpdate orb_receive_config_update = 6;
+    config.OrbUpdateConfigRequest orb_update_config_request = 7;
+    config.OrbUpdateConfigResponse orb_update_config_response = 8;
 
-message AppCommand {
-  oneof command {
-    selfserve.AppReceiveQRCommand app_receive_qr_command = 1;
-    selfserve.AppConnectedToOrbCommand app_connected_to_orb_command = 2;
-    selfserve.NotifyAppSignupStartedCommand notify_app_signup_started_command = 3;
-    selfserve.AppReceiveSignupResultCommand app_receive_signup_result_command = 4;
-    selfserve.AppShowStartSignupButtonCommand app_show_start_signup_button_command = 5;
-  }
-}
-
-message AppEvent {
-  oneof event {
-    AppConnectRequestEvent app_connect_request_event = 1;
-    selfserve.AppRequestStartSelfServeFlowEvent app_request_start_self_serve_flow_event = 2;
-    selfserve.AppRequestStartSignupEvent app_request_start_signup_event = 3;
-  }
-}
-
-message BackendEvent {
-  oneof event {
-    config.OrbUpdateConfigRequest orb_update_config_request = 1;
-  }
-}
-
-message BackendCommand {
-  oneof command {
-    config.OrbUpdateConfigResponse orb_update_config_response = 1;
+    // Self Serve Payloads
+    selfserve.OrbStartSelfServeSignup orb_start_self_serve_signup = 9;
+    selfserve.OrbSelfServeSessionStarted orb_self_serve_session_started = 10;
+    selfserve.OrbSignupStarted orb_signup_started = 11;
+    selfserve.OrbSignupCompleted orb_signup_completed = 12;
+    selfserve.AppReceiveQR app_receive_qr = 13;
+    selfserve.AppConnectedToOrb app_connected_to_orb = 14;
+    selfserve.NotifyAppSignupStarted notify_app_signup_started = 15;
+    selfserve.AppReceiveSignupResult app_receive_signup_result = 16;
+    selfserve.AppShowStartSignupButton app_show_start_signup_button = 17;
+    selfserve.AppRequestStartSelfServeFlow app_request_start_self_serve_flow = 18;
+    selfserve.AppRequestStartSignup app_request_start_signup = 19;
   }
 }
