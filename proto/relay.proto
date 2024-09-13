@@ -75,17 +75,13 @@ message RelayPayload {
     config.OrbUpdateConfigRequest orb_update_config_request = 7;
     config.OrbUpdateConfigResponse orb_update_config_response = 8;
 
-    // Self Serve Payloads
-    selfserve.OrbStartSelfServeSignup orb_start_self_serve_signup = 9;
-    selfserve.OrbSelfServeSessionStarted orb_self_serve_session_started = 10;
-    selfserve.OrbSignupStarted orb_signup_started = 11;
-    selfserve.OrbSignupCompleted orb_signup_completed = 12;
-    selfserve.AppReceiveQR app_receive_qr = 13;
-    selfserve.AppConnectedToOrb app_connected_to_orb = 14;
-    selfserve.NotifyAppSignupStarted notify_app_signup_started = 15;
-    selfserve.AppReceiveSignupResult app_receive_signup_result = 16;
-    selfserve.AppShowStartSignupButton app_show_start_signup_button = 17;
-    selfserve.AppRequestStartSelfServeFlow app_request_start_self_serve_flow = 18;
-    selfserve.AppRequestStartSignup app_request_start_signup = 19;
+    // Self-Serve Commands
+    selfserve.orb.AnnounceOrbId announce_orb_id = 9;
+    selfserve.orb.CaptureStarted capture_started = 10;
+    selfserve.orb.CaptureEnded capture_ended = 11;
+    selfserve.orb.SignupStarted signup_started = 12;
+    selfserve.orb.SignupEnded signup_ended = 13;
+    selfserve.orb.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 14;
+    selfserve.app.StartCapture start_capture = 15;
   }
 }

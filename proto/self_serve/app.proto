@@ -1,21 +1,5 @@
 syntax = "proto3";
 
-package selfserve;
+package selfserve.app;
 
-message AppReceiveQR {
-  string qr_code = 1;
-}
-
-message AppConnectedToOrb {}
-
-message AppShowStartSignupButton {}
-
-message NotifyAppSignupStarted {}
-
-message AppReceiveSignupResult {
-  bool success = 1;
-}
-
-message AppRequestStartSelfServeFlow {}
-
-message AppRequestStartSignup {}
+message StartCapture {}
