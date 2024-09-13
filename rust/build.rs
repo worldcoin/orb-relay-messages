@@ -11,6 +11,7 @@ fn main() {
                 "../proto/relay.proto",
                 "../proto/self_serve/app.proto",
                 "../proto/self_serve/orb.proto",
+                "../proto/self_serve/backend.proto",
                 "../proto/self_serve/app_old.proto",
                 "../proto/self_serve/orb_old.proto",
                 "../proto/config/backend.proto",
