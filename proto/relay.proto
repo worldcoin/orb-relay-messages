@@ -4,9 +4,7 @@ package relay;
 
 import "config/backend.proto";
 import "config/orb.proto";
-import "self_serve/app.proto";
 import "self_serve/app_old.proto";
-import "self_serve/orb.proto";
 import "self_serve/orb_old.proto";
 
 enum EntityType {

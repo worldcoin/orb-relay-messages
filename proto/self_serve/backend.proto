@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package selfserve;
 
+import "self_serve/app/app.proto";
+import "self_serve/orb/orb.proto";
+
 // Service Definitions
 service SelfServeService {
   rpc OrbConnect(stream OrbOut) returns (stream OrbIn);
@@ -12,11 +15,11 @@ message OrbOut {
   oneof req {
     TokenAuthRequest token_auth_request = 1;
 
-    orb.CaptureStarted capture_started = 2;
-    orb.CaptureEnded capture_ended = 3;
-    orb.SignupStarted signup_started = 4;
-    orb.SignupEnded signup_ended = 5;
-    orb.AgeVerificationRequiredFromOperator
+    selfserve.orb.CaptureStarted capture_started = 2;
+    selfserve.orb.CaptureEnded capture_ended = 3;
+    selfserve.orb.SignupStarted signup_started = 4;
+    selfserve.orb.SignupEnded signup_ended = 5;
+    selfserve.orb.AgeVerificationRequiredFromOperator
         age_verification_required_from_operator = 6;
   }
 }
@@ -40,14 +43,13 @@ message AppOut {
 message AppIn {
   oneof req {
     AuthResponse auth_response = 1;
-    Payload payload = 2;
 
-    orb.CaptureStarted capture_started = 3;
-    orb.CaptureEnded capture_ended = 4;
-    orb.SignupStarted signup_started = 5;
-    orb.SignupEnded signup_ended = 6;
-    orb.AgeVerificationRequiredFromOperator
-        age_verification_required_from_operator = 7;
+    selfserve.orb.CaptureStarted capture_started = 2;
+    selfserve.orb.CaptureEnded capture_ended = 3;
+    selfserve.orb.SignupStarted signup_started = 4;
+    selfserve.orb.SignupEnded signup_ended = 5;
+    selfserve.orb.AgeVerificationRequiredFromOperator
+        age_verification_required_from_operator = 6;
   }
 }
 

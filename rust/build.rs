@@ -9,8 +9,8 @@ fn main() {
         .compile(
             &[
                 "../proto/relay.proto",
-                "../proto/self_serve/app.proto",
-                "../proto/self_serve/orb.proto",
+                "../proto/self_serve/app/app.proto",
+                "../proto/self_serve/orb/orb.proto",
                 "../proto/self_serve/backend.proto",
                 "../proto/self_serve/app_old.proto",
                 "../proto/self_serve/orb_old.proto",
