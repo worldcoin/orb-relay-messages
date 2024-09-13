@@ -9,10 +9,11 @@ rust-version.workspace = true
 [features]
 client = []
 server = []
+local_codegen = ["tonic"]
 
 [dependencies]
 prost = "0.13.2"
-tonic = "0.12.2"
+tonic = { version = "0.12.2", optional = true }
 
 [build-dependencies]
 tonic-build = "0.12.2"
