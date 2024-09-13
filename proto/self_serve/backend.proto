@@ -6,12 +6,14 @@ import "self_serve/app/app.proto";
 import "self_serve/orb/orb.proto";
 
 // Service Definitions
-service SelfServeService {
-  rpc OrbConnect(stream OrbOut) returns (stream OrbIn);
-  rpc AppConnect(stream AppOut) returns (stream AppIn);
+service OrbSelfServeService {
+  rpc OrbConnect(stream FromOrb) returns (stream ToOrb);
+}
+service AppSelfServeService {
+  rpc AppConnect(stream AppOut) returns (stream ToApp);
 }
 
-message OrbOut {
+message FromOrb {
   oneof req {
     TokenAuthRequest token_auth_request = 1;
 
@@ -24,7 +26,7 @@ message OrbOut {
   }
 }
 
-message OrbIn {
+message ToOrb {
   oneof req {
     AuthResponse auth_response = 1;
 
@@ -32,7 +34,7 @@ message OrbIn {
   }
 }
 
-message AppOut {
+message FromApp {
   oneof req {
     ZkpAuthRequest zkp_auth_request = 1;
 
@@ -40,7 +42,7 @@ message AppOut {
   }
 }
 
-message AppIn {
+message ToApp {
   oneof req {
     AuthResponse auth_response = 1;
 
