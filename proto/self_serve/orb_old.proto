@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+package selfserve;
+
+message OrbStartSelfServeSignup {}
+message OrbSelfServeSessionStarted {}
+message OrbSignupStarted {}
+message OrbSignupCompleted { bool success = 1; }

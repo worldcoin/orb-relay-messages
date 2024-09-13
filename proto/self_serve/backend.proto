@@ -2,4 +2,70 @@ syntax = "proto3";
 
 package selfserve;
 
-// Backend-specific messages would go here
+// Service Definitions
+service SelfServeService {
+  rpc OrbConnect(stream OrbOut) returns (stream OrbIn);
+  rpc AppConnect(stream AppOut) returns (stream AppIn);
+}
+
+message OrbOut {
+  oneof req {
+    TokenAuthRequest token_auth_request = 1;
+
+    orb.CaptureStarted capture_started = 2;
+    orb.CaptureEnded capture_ended = 3;
+    orb.SignupStarted signup_started = 4;
+    orb.SignupEnded signup_ended = 5;
+    orb.AgeVerificationRequiredFromOperator
+        age_verification_required_from_operator = 6;
+  }
+}
+
+message OrbIn {
+  oneof req {
+    AuthResponse auth_response = 1;
+
+    app.StartCapture start_capture = 2;
+  }
+}
+
+message AppOut {
+  oneof req {
+    ZkpAuthRequest zkp_auth_request = 1;
+
+    app.StartCapture start_capture = 2;
+  }
+}
+
+message AppIn {
+  oneof req {
+    AuthResponse auth_response = 1;
+    Payload payload = 2;
+
+    orb.CaptureStarted capture_started = 3;
+    orb.CaptureEnded capture_ended = 4;
+    orb.SignupStarted signup_started = 5;
+    orb.SignupEnded signup_ended = 6;
+    orb.AgeVerificationRequiredFromOperator
+        age_verification_required_from_operator = 7;
+  }
+}
+
+message TokenAuthRequest {
+  string session_id = 1;
+  string token = 2;
+}
+
+message ZkpAuthRequest {
+  string session_id = 1;
+  string root = 2;
+  string signal_hash = 3;
+  string nullifier_hash = 4;
+  string external_nullifier_hash = 5;
+  string proof = 6;
+}
+
+message AuthResponse {
+  bool success = 1;
+  string error_message = 2;
+}

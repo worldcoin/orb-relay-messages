@@ -1,13 +1,9 @@
 syntax = "proto3";
 
-package selfserve;
+package selfserve.orb;
 
-message OrbStartSelfServeSignup {}
-
-message OrbSelfServeSessionStarted {}
-
-message OrbSignupStarted {}
-
-message OrbSignupCompleted {
-  bool success = 1;
-}
+message CaptureStarted {}
+message CaptureEnded { bool success = 1; }
+message SignupStarted {}
+message SignupEnded { bool success = 1; }
+message AgeVerificationRequiredFromOperator {}

@@ -5,7 +5,9 @@ package relay;
 import "config/backend.proto";
 import "config/orb.proto";
 import "self_serve/app.proto";
+import "self_serve/app_old.proto";
 import "self_serve/orb.proto";
+import "self_serve/orb_old.proto";
 
 enum EntityType {
   ENTITY_TYPE_UNSPECIFIED = 0;
@@ -29,7 +31,8 @@ service AppService {
 }
 
 service BackendService {
-  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
+  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest)
+      returns (config.OrbUpdateConfigResponse);
 }
 
 message RelayMessage {
@@ -54,13 +57,9 @@ message ConnectResponse {
   string error = 3;
 }
 
-message Ping {
-  optional string id = 1;
-}
+message Ping { optional string id = 1; }
 
-message Pong {
-  optional string id = 1;
-}
+message Pong { optional string id = 1; }
 
 message RelayPayload {
   oneof payload {
@@ -85,7 +84,8 @@ message RelayPayload {
     selfserve.NotifyAppSignupStarted notify_app_signup_started = 15;
     selfserve.AppReceiveSignupResult app_receive_signup_result = 16;
     selfserve.AppShowStartSignupButton app_show_start_signup_button = 17;
-    selfserve.AppRequestStartSelfServeFlow app_request_start_self_serve_flow = 18;
+    selfserve.AppRequestStartSelfServeFlow app_request_start_self_serve_flow =
+        18;
     selfserve.AppRequestStartSignup app_request_start_signup = 19;
   }
 }
