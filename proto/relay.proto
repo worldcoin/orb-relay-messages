@@ -83,5 +83,6 @@ message RelayPayload {
     selfserve.orb.SignupEnded signup_ended = 13;
     selfserve.orb.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 14;
     selfserve.app.StartCapture start_capture = 15;
+    selfserve.orb.SelfServeStatus self_serve_status = 16;
   }
 }
