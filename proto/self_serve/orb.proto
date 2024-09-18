@@ -2,6 +2,9 @@ syntax = "proto3";
 
 package selfserve.orb;
 
+message SelfServeStatus {
+  bool is_self_serve_enabled = 1;
+}
 message AnnounceOrbId {
   string orb_id = 1;
 }
