@@ -4,8 +4,8 @@ package relay;
 
 import "config/backend.proto";
 import "config/orb.proto";
-import "self_serve/app.proto";
-import "self_serve/orb.proto";
+import "self_serve/app/v1/app.proto";
+import "self_serve/orb/v1/orb.proto";
 
 enum EntityType {
   ENTITY_TYPE_UNSPECIFIED = 0;
@@ -19,7 +19,6 @@ message Entity {
   EntityType entity_type = 2;
 }
 
-// Service Definitions
 service OrbService {
   rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
 }
@@ -76,13 +75,12 @@ message RelayPayload {
     config.OrbUpdateConfigResponse orb_update_config_response = 8;
 
     // Self-Serve Commands
-    selfserve.orb.AnnounceOrbId announce_orb_id = 9;
-    selfserve.orb.CaptureStarted capture_started = 10;
-    selfserve.orb.CaptureEnded capture_ended = 11;
-    selfserve.orb.SignupStarted signup_started = 12;
-    selfserve.orb.SignupEnded signup_ended = 13;
-    selfserve.orb.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 14;
-    selfserve.app.StartCapture start_capture = 15;
-    selfserve.orb.SelfServeStatus self_serve_status = 16;
+    self_serve.orb.v1.AnnounceOrbId announce_orb_id = 9;
+    self_serve.orb.v1.CaptureStarted capture_started = 10;
+    self_serve.orb.v1.CaptureEnded capture_ended = 11;
+    self_serve.orb.v1.SignupEnded signup_ended = 12;
+    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 13;
+    self_serve.app.v1.StartCapture start_capture = 14;
+    self_serve.app.v1.RequestState request_state = 15;
   }
 }

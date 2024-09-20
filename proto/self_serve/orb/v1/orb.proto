@@ -1,18 +1,15 @@
 syntax = "proto3";
 
-package selfserve.orb;
+package self_serve.orb.v1;
 
-message SelfServeStatus {
-  bool is_self_serve_enabled = 1;
-}
 message AnnounceOrbId {
   string orb_id = 1;
+  bool is_self_serve_enabled = 2;
 }
 message CaptureStarted {}
 message CaptureEnded {
   bool success = 1;
 }
-message SignupStarted {}
 message SignupEnded {
   bool success = 1;
 }
