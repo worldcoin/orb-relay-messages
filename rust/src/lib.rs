@@ -5,12 +5,16 @@ pub mod relay {
     tonic::include_proto!("relay");
 }
 
-pub mod selfserve {
+pub mod self_serve {
     pub mod app {
-        tonic::include_proto!("selfserve.app");
+        pub mod v1 {
+            tonic::include_proto!("self_serve.app.v1");
+        }
     }
     pub mod orb {
-        tonic::include_proto!("selfserve.orb");
+        pub mod v1 {
+            tonic::include_proto!("self_serve.orb.v1");
+        }
     }
 }
 
