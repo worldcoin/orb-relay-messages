@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package config;
 
+service BackendService {
+  rpc RequestOrbUpdateConfig(OrbUpdateConfigRequest) returns (OrbUpdateConfigResponse);
+}
+
 message OrbUpdateConfigRequest {
   string orb_id = 1;
   string config = 2;
@@ -10,4 +14,14 @@ message OrbUpdateConfigRequest {
 message OrbUpdateConfigResponse {
   string orb_id = 1;
   bool success = 2;
+}
+
+message OrbReceiveConfigUpdate {
+  string config = 1;
+}
+
+message RelayPayload {
+  OrbReceiveConfigUpdate orb_receive_config_update = 1;
+  OrbUpdateConfigRequest orb_update_config_request = 2;
+  OrbUpdateConfigResponse orb_update_config_response = 3;
 }

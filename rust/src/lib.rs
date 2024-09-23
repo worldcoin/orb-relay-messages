@@ -1,11 +1,12 @@
 pub use ::prost;
 pub use ::tonic;
 
-pub mod relay {
-    tonic::include_proto!("relay");
-}
-
 pub mod self_serve {
+    pub mod relay {
+        pub mod v1 {
+            tonic::include_proto!("self_serve.relay.v1");
+        }
+    }
     pub mod app {
         pub mod v1 {
             tonic::include_proto!("self_serve.app.v1");

@@ -8,11 +8,10 @@ fn main() {
         .build_server(cfg!(feature = "server"))
         .compile(
             &[
-                "./proto/relay.proto",
+                "./proto/self_serve/relay/v1/relay.proto",
                 "./proto/self_serve/app/v1/app.proto",
                 "./proto/self_serve/orb/v1/orb.proto",
                 "./proto/config/backend.proto",
-                "./proto/config/orb.proto",
             ],
             &["./proto"],
         )

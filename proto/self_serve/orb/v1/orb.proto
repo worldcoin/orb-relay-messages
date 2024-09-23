@@ -13,14 +13,15 @@ message AnnounceOrbId {
 message CaptureStarted {}
 message CaptureEnded {
   bool success = 1;
+  repeated FailureFeedback failure_feedback = 2;
 }
 message SignupEnded {
   bool success = 1;
-  repeated FailureReason failure_reason = 2;
+  repeated FailureFeedback failure_feedback = 2;
 }
 message AgeVerificationRequiredFromOperator {}
 
-enum FailureReasonType {
+enum FailureFeedbackType {
   UNKNOWN = 0;
   CONTACT_LENSES = 1;
   EYE_GLASSES = 2;
@@ -33,7 +34,7 @@ enum FailureReasonType {
   HEAD_POSE = 9;
 }
 
-message FailureReason {
-  FailureReasonType type = 1;
+message FailureFeedback {
+  FailureFeedbackType type = 1;
   string message = 2;
 }

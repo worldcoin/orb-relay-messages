@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package config;
-
-message OrbReceiveConfigUpdate {
-  string config = 1;
-}

@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package self_serve.relay.v1;
+
+import "self_serve/app/v1/app.proto";
+import "self_serve/orb/v1/orb.proto";
+
+enum EntityType {
+  ENTITY_TYPE_UNSPECIFIED = 0;
+  APP = 1;
+  ORB = 2;
+  SERVICE = 3;
+}
+
+message Entity {
+  string id = 1;
+  EntityType entity_type = 2;
+}
+
+service OrbService {
+  rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
+}
+
+service AppService {
+  rpc AppConnect(stream RelayMessage) returns (stream RelayMessage);
+}
+
+message Ack {
+  uint32 seq = 1;
+}
+
+message OrbConnectRequest {
+  string orb_id = 1;
+  string auth_token = 2;
+}
+
+message AppConnectRequest {
+  string app_id = 1;
+  string auth_token = 2;
+}
+
+message ConnectResponse {
+  string client_id = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message RelayMessage {
+  Entity src = 1;
+  Entity dst = 2;
+  uint32 seq = 3;
+
+  oneof payload {
+    OrbConnectRequest orb_connect_request = 4;
+    AppConnectRequest app_connect_request = 5;
+    ConnectResponse connect_response = 6;
+    Ack ack = 7;
+
+    self_serve.orb.v1.AnnounceOrbId announce_orb_id = 8;
+    self_serve.orb.v1.CaptureStarted capture_started = 9;
+    self_serve.orb.v1.CaptureEnded capture_ended = 10;
+    self_serve.orb.v1.SignupEnded signup_ended = 11;
+    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 12;
+    self_serve.orb.v1.SelfServeStatus self_serve_status = 13;
+    self_serve.orb.v1.NoState no_state = 14;
+    self_serve.app.v1.StartCapture start_capture = 15;
+    self_serve.app.v1.RequestState request_state = 16;
+  }
+}
