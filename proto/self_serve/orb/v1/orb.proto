@@ -16,5 +16,24 @@ message CaptureEnded {
 }
 message SignupEnded {
   bool success = 1;
+  repeated FailureReason failure_reason = 2;
 }
 message AgeVerificationRequiredFromOperator {}
+
+enum FailureReasonType {
+  UNKNOWN = 0;
+  CONTACT_LENSES = 1;
+  EYE_GLASSES = 2;
+  MASK = 3;
+  FACE_OCCLUSION = 4;
+  FACE_OCCLUSION_OR_POOR_LIGHTING = 5;
+  MULTIPLE_FACES = 6;
+  EYES_OCCLUSION = 7;
+  TOO_FAR = 8;
+  HEAD_POSE = 9;
+}
+
+message FailureReason {
+  FailureReasonType type = 1;
+  string message = 2;
+}
