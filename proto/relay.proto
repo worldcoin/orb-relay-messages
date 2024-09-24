@@ -44,8 +44,8 @@ message OrbConnectRequest {
 
 message AppConnectRequest {
   string app_id = 1;
-  oneof body {
-    string auth_token = 2;
+  oneof auth_method {
+    string token = 2;
     ZkpAuthRequest zkp_auth_request = 3;
   }
 }
