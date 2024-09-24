@@ -32,6 +32,8 @@ enum FailureFeedbackType {
   EYES_OCCLUSION = 7;
   TOO_FAR = 8;
   HEAD_POSE = 9;
+  SERVER_ERROR = 10;
+  UNDERAGED = 11;
 }
 
 message FailureFeedback {
