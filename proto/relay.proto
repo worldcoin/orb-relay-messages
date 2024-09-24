@@ -35,6 +35,11 @@ message RelayMessage {
   Entity src = 1;
   Entity dst = 2;
   RelayPayload payload = 3;
+  uint64 seq = 4;
+}
+
+message Ack {
+  uint64 seq = 1;
 }
 
 message OrbConnectRequest {
@@ -92,5 +97,9 @@ message RelayPayload {
     self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 13;
     self_serve.app.v1.StartCapture start_capture = 14;
     self_serve.app.v1.RequestState request_state = 15;
+    self_serve.orb.v1.SelfServeStatus self_serve_status = 16;
+    self_serve.orb.v1.NoState no_state = 17;
+
+    Ack ack = 18;
   }
 }
