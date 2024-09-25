@@ -12,9 +12,31 @@ message AnnounceOrbId {
 }
 message CaptureStarted {}
 message CaptureEnded {
+  enum FailureFeedbackType {
+    UNKNOWN = 0;
+    FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
+    TOO_FAR = 2;
+    EYES_OCCLUSION = 3;
+  }
+
   bool success = 1;
+  repeated FailureFeedbackType failure_feedback = 2;
 }
 message SignupEnded {
+  enum FailureFeedbackType {
+    UNKNOWN = 0;
+    CONTACT_LENSES = 1;
+    EYE_GLASSES = 2;
+    MASK = 3;
+    FACE_OCCLUSION = 4;
+    MULTIPLE_FACES = 5;
+    EYES_OCCLUSION = 6;
+    HEAD_POSE = 7;
+    UNDERAGED = 8;
+    SERVER_ERROR = 9;
+  }
+
   bool success = 1;
+  repeated FailureFeedbackType failure_feedback = 2;
 }
 message AgeVerificationRequiredFromOperator {}
