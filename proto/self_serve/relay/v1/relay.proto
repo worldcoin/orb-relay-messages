@@ -71,9 +71,8 @@ message RelayMessage {
     self_serve.orb.v1.CaptureEnded capture_ended = 10;
     self_serve.orb.v1.SignupEnded signup_ended = 11;
     self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 12;
-    self_serve.orb.v1.SelfServeStatus self_serve_status = 13;
-    self_serve.orb.v1.NoState no_state = 14;
-    self_serve.app.v1.StartCapture start_capture = 15;
-    self_serve.app.v1.RequestState request_state = 16;
+    self_serve.orb.v1.NoState no_state = 13;
+    self_serve.app.v1.StartCapture start_capture = 14;
+    self_serve.app.v1.RequestState request_state = 15;
   }
 }
