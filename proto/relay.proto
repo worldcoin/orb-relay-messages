@@ -20,7 +20,7 @@ message Entity {
 }
 
 service RelayService {
-  rpc Connect(stream RelayMessage) returns (stream RelayMessage);
+  rpc EstablishConnection(stream RelayMessage) returns (stream RelayMessage);
 }
 
 service OrbService {
