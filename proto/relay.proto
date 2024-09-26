@@ -19,6 +19,10 @@ message Entity {
   EntityType entity_type = 2;
 }
 
+service RelayService {
+  rpc Connect(stream RelayMessage) returns (stream RelayMessage);
+}
+
 service OrbService {
   rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
 }
@@ -40,6 +44,14 @@ message RelayMessage {
 
 message Ack {
   uint64 seq = 1;
+}
+
+message ConnectRequest {
+  string client_id = 1;
+  oneof auth_method {
+    string token = 2;
+    ZkpAuthRequest zkp_auth_request = 3;
+  }
 }
 
 message OrbConnectRequest {
