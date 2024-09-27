@@ -11,7 +11,7 @@ message AnnounceOrbId {
   bool is_self_serve_enabled = 2;
 }
 message CaptureStarted {}
-message StartCaptureTimeout {}
+message CaptureTriggerTimeout {}
 message CaptureEnded {
   enum FailureFeedbackType {
     UNKNOWN = 0;
