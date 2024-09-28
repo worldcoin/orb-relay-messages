@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package relay;
 
+import "google/protobuf/any.proto";
+
 import "config/backend.proto";
 import "config/orb.proto";
 import "self_serve/app/v1/app.proto";
@@ -20,7 +22,7 @@ message Entity {
 }
 
 service RelayService {
-  rpc EstablishConnection(stream RelayMessage) returns (stream RelayMessage);
+  rpc RelayConnect(stream RelayMessage) returns (stream RelayMessage);
 }
 
 service OrbService {
@@ -113,5 +115,8 @@ message RelayPayload {
     self_serve.orb.v1.NoState no_state = 17;
 
     Ack ack = 18;
+
+    ConnectRequest connect_request = 19;
+    google.protobuf.Any any_payload = 20;
   }
 }
