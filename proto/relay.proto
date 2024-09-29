@@ -22,7 +22,7 @@ message Entity {
 }
 
 service RelayService {
-  rpc RelayConnect(stream RelayMessage) returns (stream RelayMessage);
+  rpc Connect(stream RelayMessage) returns (stream RelayMessage);
 }
 
 service OrbService {
@@ -48,7 +48,7 @@ message Ack {
   uint64 seq = 1;
 }
 
-message ConnectRequest {
+message EstablishConnectionRequest {
   string client_id = 1;
   oneof auth_method {
     string token = 2;
@@ -116,7 +116,7 @@ message RelayPayload {
 
     Ack ack = 18;
 
-    ConnectRequest connect_request = 19;
+    EstablishConnectionRequest connect_request = 19;
     google.protobuf.Any any_payload = 20;
   }
 }
