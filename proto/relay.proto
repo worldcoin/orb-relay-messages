@@ -2,10 +2,9 @@ syntax = "proto3";
 
 package relay;
 
-import "google/protobuf/any.proto";
-
 import "config/backend.proto";
 import "config/orb.proto";
+import "google/protobuf/any.proto";
 import "self_serve/app/v1/app.proto";
 import "self_serve/orb/v1/orb.proto";
 
