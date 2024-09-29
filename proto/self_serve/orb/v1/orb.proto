@@ -11,12 +11,14 @@ message AnnounceOrbId {
   bool is_self_serve_enabled = 2;
 }
 message CaptureStarted {}
+message CaptureTriggerTimeout {}
 message CaptureEnded {
   enum FailureFeedbackType {
     UNKNOWN = 0;
     FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
     TOO_FAR = 2;
-    EYES_OCCLUSION = 3;
+    TOO_CLOSE = 3;
+    EYES_OCCLUSION = 4;
   }
 
   bool success = 1;
