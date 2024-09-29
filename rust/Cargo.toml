@@ -1,9 +1,9 @@
 [package]
-name = "orb-relay-messages"
-version = "0.0.0"
-edition.workspace = true
-license.workspace = true
-repository.workspace = true
+name                   = "orb-relay-messages"
+version                = "0.0.0"
+edition.workspace      = true
+license.workspace      = true
+repository.workspace   = true
 rust-version.workspace = true
 
 [features]
@@ -11,8 +11,9 @@ client = []
 server = []
 
 [dependencies]
-prost = "0.13.2"
-tonic = "0.12.2"
+prost       = "0.13.2"
+prost-types = "0.13.3"
+tonic       = "0.12.2"
 
 [build-dependencies]
 tonic-build = "0.12.2"
