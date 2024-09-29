@@ -115,5 +115,8 @@ message RelayPayload {
     self_serve.orb.v1.SelfServeStatus self_serve_status = 17;
     self_serve.orb.v1.NoState no_state = 18;
     self_serve.orb.v1.CaptureTriggerTimeout capture_trigger_timeout = 19;
+
+    EstablishConnectionRequest connect_request = 20;
+    google.protobuf.Any any_payload = 21;
   }
 }
