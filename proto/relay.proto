@@ -44,7 +44,9 @@ message RelayMessage {
   uint64 seq = 4;
 }
 
-message Ack { uint64 seq = 1; }
+message Ack {
+  uint64 seq = 1;
+}
 
 message EstablishConnectionRequest {
   string client_id = 1;
