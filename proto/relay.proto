@@ -34,8 +34,7 @@ service AppService {
 }
 
 service BackendService {
-  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest)
-      returns (config.OrbUpdateConfigResponse);
+  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
 }
 
 message RelayMessage {
@@ -111,8 +110,7 @@ message RelayPayload {
     self_serve.orb.v1.CaptureStarted capture_started = 11;
     self_serve.orb.v1.CaptureEnded capture_ended = 12;
     self_serve.orb.v1.SignupEnded signup_ended = 13;
-    self_serve.orb.v1.AgeVerificationRequiredFromOperator
-        age_verification_required_from_operator = 14;
+    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 14;
     self_serve.app.v1.StartCapture start_capture = 15;
     self_serve.app.v1.RequestState request_state = 16;
     self_serve.orb.v1.SelfServeStatus self_serve_status = 17;
