@@ -89,7 +89,8 @@ message Ping {
 
 message Pong {
   string id = 1;
-  google.protobuf.Timestamp ping_timestamp = 2;
+  google.protobuf.Timestamp timestamp = 2;
+  google.protobuf.Timestamp ping_timestamp = 3;
 }
 
 message RelayPayload {
