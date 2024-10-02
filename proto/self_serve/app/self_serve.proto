@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package self_serve.app;
+
+message AppSelfServeModeMessage {
+  oneof message {
+    StartCapture start_capture = 1;
+    RequestState request_state = 2;
+  }
+}
+
+message StartCapture {}
+message RequestState {}

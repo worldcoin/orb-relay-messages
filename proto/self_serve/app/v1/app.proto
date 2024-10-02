@@ -1,6 +1,0 @@
-syntax = "proto3";
-
-package self_serve.app.v1;
-
-message StartCapture {}
-message RequestState {}

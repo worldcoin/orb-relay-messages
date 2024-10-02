@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package self_serve.orb;
+
+enum OrbMode {
+  ORB_MODE_UNSPECIFIED = 0;
+  LEGACY = 1;
+  SELF_SERVE = 2;
+}
+
+enum OrbType {
+  ORB_TYPE_UNSPECIFIED = 0;
+  PEARL = 1;
+  DIAMOND = 2;
+}
+
+message OrbMetadata {
+  string orb_id = 1;
+  OrbType orb_type = 2;
+  OrbMode orb_mode = 3;
+}
