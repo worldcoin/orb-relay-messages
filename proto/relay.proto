@@ -83,13 +83,13 @@ message ConnectResponse {
 }
 
 message Ping {
-  optional string id = 1;
-  optional google.protobuf.Timestamp timestamp = 2;
+  string id = 1;
+  google.protobuf.Timestamp timestamp = 2;
 }
 
 message Pong {
-  optional string id = 1;
-  optional google.protobuf.Timestamp ping_timestamp = 2;
+  string id = 1;
+  google.protobuf.Timestamp ping_timestamp = 2;
 }
 
 message RelayPayload {
