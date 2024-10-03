@@ -22,33 +22,46 @@ message Entity {
 }
 
 service RelayService {
-  rpc RelayConnect(stream RelayMessage) returns (stream RelayMessage);
+  rpc RelayConnect(stream RequestStream) returns (stream ResponseStream);
 }
 
 service OrbService {
-  rpc OrbConnect(stream RelayMessage) returns (stream RelayMessage);
+  rpc OrbConnect(stream RequestStream) returns (stream ResponseStream);
 }
 
 service AppService {
-  rpc AppConnect(stream RelayMessage) returns (stream RelayMessage);
+  rpc AppConnect(stream RequestStream) returns (stream ResponseStream);
 }
 
 service BackendService {
   rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
 }
 
-message RelayMessage {
-  Entity src = 1;
-  Entity dst = 2;
-  RelayPayload payload = 3;
-  uint64 seq = 4;
+message RequestStream {
+  oneof msg {
+    Heartbeat heartbeat = 1;
+    ConnectRequest connect_request = 2;
+    RelayPayload payload = 3;
+  }
+}
+
+message ResponseStream {
+  oneof msg {
+    Ack ack = 1;
+    ConnectResponse connect_response = 2;
+    RelayPayload payload = 3;
+  }
+}
+
+message Heartbeat {
+  uint64 seq = 1;
 }
 
 message Ack {
   uint64 seq = 1;
 }
 
-message EstablishConnectionRequest {
+message ConnectRequest {
   string client_id = 1;
   oneof auth_method {
     string token = 2;
@@ -94,32 +107,35 @@ message Pong {
 }
 
 message RelayPayload {
-  oneof payload {
-    Ack ack = 1;
+  Entity src = 1;
+  Entity dst = 2;
+  uint64 seq = 3;
 
-    OrbConnectRequest orb_connect_request = 2;
-    AppConnectRequest app_connect_request = 3;
-    ConnectResponse connect_response = 4;
-    Ping ping = 5;
-    Pong pong = 6;
+  oneof payload {
+    Ack ack = 4;
+
+    OrbConnectRequest orb_connect_request = 5;
+    AppConnectRequest app_connect_request = 6;
+    ConnectResponse connect_response = 7;
+    Ping ping = 8;
+    Pong pong = 9;
 
     // Config Payloads
-    config.OrbReceiveConfigUpdate orb_receive_config_update = 7;
-    config.OrbUpdateConfigRequest orb_update_config_request = 8;
-    config.OrbUpdateConfigResponse orb_update_config_response = 9;
+    config.OrbReceiveConfigUpdate orb_receive_config_update = 10;
+    config.OrbUpdateConfigRequest orb_update_config_request = 11;
+    config.OrbUpdateConfigResponse orb_update_config_response = 12;
 
     // Self-Serve Commands
-    self_serve.orb.v1.AnnounceOrbId announce_orb_id = 10;
-    self_serve.orb.v1.CaptureStarted capture_started = 11;
-    self_serve.orb.v1.CaptureEnded capture_ended = 12;
-    self_serve.orb.v1.SignupEnded signup_ended = 13;
-    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 14;
-    self_serve.app.v1.StartCapture start_capture = 15;
-    self_serve.app.v1.RequestState request_state = 16;
-    self_serve.orb.v1.NoState no_state = 18;
-    self_serve.orb.v1.CaptureTriggerTimeout capture_trigger_timeout = 19;
+    self_serve.orb.v1.AnnounceOrbId announce_orb_id = 13;
+    self_serve.orb.v1.CaptureStarted capture_started = 14;
+    self_serve.orb.v1.CaptureEnded capture_ended = 15;
+    self_serve.orb.v1.SignupEnded signup_ended = 16;
+    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 17;
+    self_serve.app.v1.StartCapture start_capture = 18;
+    self_serve.app.v1.RequestState request_state = 19;
+    self_serve.orb.v1.NoState no_state = 20;
+    self_serve.orb.v1.CaptureTriggerTimeout capture_trigger_timeout = 21;
 
-    EstablishConnectionRequest connect_request = 20;
-    google.protobuf.Any any_payload = 21;
+    google.protobuf.Any any_payload = 22;
   }
 }
