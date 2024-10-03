@@ -2,23 +2,47 @@ syntax = "proto3";
 
 package self_serve.orb.v1;
 
-message NoState {}
-message SelfServeStatus {
-  bool is_self_serve_enabled = 1;
+// Wrapper message for all messages that can be sent to and from the orb. The reason we do this is to ensure static
+// typing in the clients while the server can still handle all messages through the Any type.
+message W {
+  oneof w {
+    NoState no_state = 1;
+    AnnounceOrbId announce_orb_id = 2;
+    CaptureStarted capture_started = 3;
+    CaptureTriggerTimeout capture_trigger_timeout = 4;
+    CaptureEnded capture_ended = 5;
+    SignupEnded signup_ended = 6;
+    AgeVerificationRequiredFromOperator age_verification_required_from_operator = 7;
+  }
 }
+
+message NoState {}
 message AnnounceOrbId {
+  enum ModeType {
+    MODE_TYPE_UNSPECIFIED = 0;
+    MODE_TYPE_LEGACY = 1;
+    MODE_TYPE_SELF_SERVE = 2;
+  }
+
+  enum HardwareType {
+    HARDWARE_TYPE_UNSPECIFIED = 0;
+    HARDWARE_TYPE_PEARL = 1;
+    HARDWARE_TYPE_DIAMOND = 2;
+  }
+
   string orb_id = 1;
-  bool is_self_serve_enabled = 2;
+  ModeType mode_type = 2;
+  HardwareType hardware_type = 3;
 }
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {
   enum FailureFeedbackType {
-    UNKNOWN = 0;
-    FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
-    TOO_FAR = 2;
-    TOO_CLOSE = 3;
-    EYES_OCCLUSION = 4;
+    FAILURE_FEEDBACK_TYPE_UNSPECIFIED = 0;
+    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
+    FAILURE_FEEDBACK_TYPE_TOO_FAR = 2;
+    FAILURE_FEEDBACK_TYPE_TOO_CLOSE = 3;
+    FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 4;
   }
 
   bool success = 1;
@@ -26,17 +50,17 @@ message CaptureEnded {
 }
 message SignupEnded {
   enum FailureFeedbackType {
-    UNKNOWN = 0;
-    CONTACT_LENSES = 1;
-    EYE_GLASSES = 2;
-    MASK = 3;
-    FACE_OCCLUSION = 4;
-    MULTIPLE_FACES = 5;
-    EYES_OCCLUSION = 6;
-    HEAD_POSE = 7;
-    UNDERAGED = 8;
-    SERVER_ERROR = 9;
-    LOW_IMAGE_QUALITY = 10;
+    FAILURE_FEEDBACK_TYPE_UNSPECIFIED = 0;
+    FAILURE_FEEDBACK_TYPE_CONTACT_LENSES = 1;
+    FAILURE_FEEDBACK_TYPE_EYE_GLASSES = 2;
+    FAILURE_FEEDBACK_TYPE_MASK = 3;
+    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION = 4;
+    FAILURE_FEEDBACK_TYPE_MULTIPLE_FACES = 5;
+    FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 6;
+    FAILURE_FEEDBACK_TYPE_HEAD_POSE = 7;
+    FAILURE_FEEDBACK_TYPE_UNDERAGED = 8;
+    FAILURE_FEEDBACK_TYPE_SERVER_ERROR = 9;
+    FAILURE_FEEDBACK_TYPE_LOW_IMAGE_QUALITY = 10;
   }
 
   bool success = 1;
