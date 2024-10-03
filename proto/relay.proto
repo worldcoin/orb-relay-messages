@@ -2,42 +2,13 @@ syntax = "proto3";
 
 package relay;
 
-import "config/backend.proto";
-import "config/orb.proto";
 import "google/protobuf/any.proto";
-import "google/protobuf/timestamp.proto";
-import "self_serve/app/v1/app.proto";
-import "self_serve/orb/v1/orb.proto";
-
-enum EntityType {
-  ENTITY_TYPE_UNSPECIFIED = 0;
-  APP = 1;
-  ORB = 2;
-  SERVICE = 3;
-}
-
-message Entity {
-  string id = 1;
-  EntityType entity_type = 2;
-}
 
 service RelayService {
-  rpc RelayConnect(stream RequestStream) returns (stream ResponseStream);
+  rpc RelayConnect(stream RelayConnectRequest) returns (stream RelayConnectResponse);
 }
 
-service OrbService {
-  rpc OrbConnect(stream RequestStream) returns (stream ResponseStream);
-}
-
-service AppService {
-  rpc AppConnect(stream RequestStream) returns (stream ResponseStream);
-}
-
-service BackendService {
-  rpc RequestOrbUpdateConfig(config.OrbUpdateConfigRequest) returns (config.OrbUpdateConfigResponse);
-}
-
-message RequestStream {
+message RelayConnectRequest {
   oneof msg {
     Heartbeat heartbeat = 1;
     ConnectRequest connect_request = 2;
@@ -45,7 +16,7 @@ message RequestStream {
   }
 }
 
-message ResponseStream {
+message RelayConnectResponse {
   oneof msg {
     Ack ack = 1;
     ConnectResponse connect_response = 2;
@@ -61,21 +32,20 @@ message Ack {
   uint64 seq = 1;
 }
 
-message ConnectRequest {
-  string client_id = 1;
-  oneof auth_method {
-    string token = 2;
-    ZkpAuthRequest zkp_auth_request = 3;
+message Entity {
+  enum EntityType {
+    ENTITY_TYPE_UNSPECIFIED = 0;
+    ENTITY_TYPE_APP = 1;
+    ENTITY_TYPE_ORB = 2;
+    ENTITY_TYPE_SERVICE = 3;
   }
+
+  string id = 1;
+  EntityType entity_type = 2;
 }
 
-message OrbConnectRequest {
-  string orb_id = 1;
-  string auth_token = 2;
-}
-
-message AppConnectRequest {
-  string app_id = 1;
+message ConnectRequest {
+  Entity client_id = 1;
   oneof auth_method {
     string token = 2;
     ZkpAuthRequest zkp_auth_request = 3;
@@ -95,47 +65,9 @@ message ConnectResponse {
   string error = 3;
 }
 
-message Ping {
-  string id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-}
-
-message Pong {
-  string id = 1;
-  google.protobuf.Timestamp timestamp = 2;
-  google.protobuf.Timestamp ping_timestamp = 3;
-}
-
 message RelayPayload {
   Entity src = 1;
   Entity dst = 2;
   uint64 seq = 3;
-
-  oneof payload {
-    Ack ack = 4;
-
-    OrbConnectRequest orb_connect_request = 5;
-    AppConnectRequest app_connect_request = 6;
-    ConnectResponse connect_response = 7;
-    Ping ping = 8;
-    Pong pong = 9;
-
-    // Config Payloads
-    config.OrbReceiveConfigUpdate orb_receive_config_update = 10;
-    config.OrbUpdateConfigRequest orb_update_config_request = 11;
-    config.OrbUpdateConfigResponse orb_update_config_response = 12;
-
-    // Self-Serve Commands
-    self_serve.orb.v1.AnnounceOrbId announce_orb_id = 13;
-    self_serve.orb.v1.CaptureStarted capture_started = 14;
-    self_serve.orb.v1.CaptureEnded capture_ended = 15;
-    self_serve.orb.v1.SignupEnded signup_ended = 16;
-    self_serve.orb.v1.AgeVerificationRequiredFromOperator age_verification_required_from_operator = 17;
-    self_serve.app.v1.StartCapture start_capture = 18;
-    self_serve.app.v1.RequestState request_state = 19;
-    self_serve.orb.v1.NoState no_state = 20;
-    self_serve.orb.v1.CaptureTriggerTimeout capture_trigger_timeout = 21;
-
-    google.protobuf.Any any_payload = 22;
-  }
+  google.protobuf.Any payload = 4;
 }
