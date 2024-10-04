@@ -6,34 +6,14 @@ package self_serve.orb.v1;
 // typing in the clients while the server can still handle all messages through the Any type.
 message W {
   oneof w {
-    NoState no_state = 1;
-    AnnounceOrbId announce_orb_id = 2;
-    CaptureStarted capture_started = 3;
-    CaptureTriggerTimeout capture_trigger_timeout = 4;
-    CaptureEnded capture_ended = 5;
-    SignupEnded signup_ended = 6;
-    AgeVerificationRequiredFromOperator age_verification_required_from_operator = 7;
+    CaptureStarted capture_started = 1;
+    CaptureTriggerTimeout capture_trigger_timeout = 2;
+    CaptureEnded capture_ended = 3;
+    SignupEnded signup_ended = 4;
+    AgeVerificationRequiredFromOperator age_verification_required_from_operator = 5;
   }
 }
 
-message NoState {}
-message AnnounceOrbId {
-  enum ModeType {
-    MODE_TYPE_UNSPECIFIED = 0;
-    MODE_TYPE_LEGACY = 1;
-    MODE_TYPE_SELF_SERVE = 2;
-  }
-
-  enum HardwareType {
-    HARDWARE_TYPE_UNSPECIFIED = 0;
-    HARDWARE_TYPE_PEARL = 1;
-    HARDWARE_TYPE_DIAMOND = 2;
-  }
-
-  string orb_id = 1;
-  ModeType mode_type = 2;
-  HardwareType hardware_type = 3;
-}
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {

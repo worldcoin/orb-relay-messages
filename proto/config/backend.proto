@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package config;
 
+service BackendService {
+  rpc RequestOrbUpdateConfig(OrbUpdateConfigRequest) returns (OrbUpdateConfigResponse);
+}
+
 message OrbUpdateConfigRequest {
   string orb_id = 1;
   string config = 2;

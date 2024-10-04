@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package common.v1;
+
+// Wrapper message for all messages that can be sent to and from the orb. The reason we do this is to ensure static
+// typing in the clients while the server can still handle all messages through the Any type.
+message W {
+  oneof w {
+    NoState no_state = 1;
+    AnnounceOrbId announce_orb_id = 2;
+  }
+}
+
+message NoState {}
+message AnnounceOrbId {
+  enum ModeType {
+    MODE_TYPE_UNSPECIFIED = 0;
+    MODE_TYPE_LEGACY = 1;
+    MODE_TYPE_SELF_SERVE = 2;
+  }
+
+  enum HardwareType {
+    HARDWARE_TYPE_UNSPECIFIED = 0;
+    HARDWARE_TYPE_PEARL = 1;
+    HARDWARE_TYPE_DIAMOND = 2;
+  }
+
+  string orb_id = 1;
+  ModeType mode_type = 2;
+  HardwareType hardware_type = 3;
+}
