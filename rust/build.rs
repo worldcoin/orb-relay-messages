@@ -6,7 +6,7 @@ fn main() {
     let mut config = prost_build::Config::new();
     config
         .enable_type_names()
-        .type_name_domain(["."], "type.worldcoin.orb");
+        .type_name_domain(["."], "type.googleapis.com");
     tonic_build::configure()
         .build_client(cfg!(feature = "client"))
         .build_server(cfg!(feature = "server"))
