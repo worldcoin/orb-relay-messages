@@ -9,7 +9,7 @@ service RelayService {
 }
 
 message RelayConnectRequest {
-  oneof msg {
+  oneof req_msg {
     Heartbeat heartbeat = 1;
     ConnectRequest connect_request = 2;
     RelayPayload payload = 3;
@@ -17,7 +17,7 @@ message RelayConnectRequest {
 }
 
 message RelayConnectResponse {
-  oneof msg {
+  oneof rsp_msg {
     Ack ack = 1;
     ConnectResponse connect_response = 2;
     RelayPayload payload = 3;
