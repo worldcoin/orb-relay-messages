@@ -24,4 +24,6 @@ fn main() {
             &["./proto"],
         )
         .unwrap();
+
+    println!("cargo:proto_path={}", std::env::current_dir().unwrap().join("proto").display());
 }
