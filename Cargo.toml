@@ -6,4 +6,4 @@ members = ["rust"]
 edition = "2021"
 license = "MIT OR (Apache-2.0 WITH LLVM-exception)"
 repository = "https://github.com/worldcoin/orb-relay-messages"
-rust-version = "1.79.0" # See rust-version.toml
+rust-version = "1.82.0"                                        # See rust-version.toml
