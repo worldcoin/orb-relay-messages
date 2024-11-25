@@ -42,7 +42,7 @@ message Entity {
 
   string id = 1;
   EntityType entity_type = 2;
-  optional string namespace = 3;
+  string namespace = 3;
 }
 
 message ConnectRequest {
