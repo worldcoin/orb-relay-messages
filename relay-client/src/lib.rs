@@ -1,9 +1,13 @@
-use bon::{bon, Builder};
+use bon::Builder;
 use orb_relay_messages::relay::{entity::EntityType, Entity};
+use std::time::Duration;
 use tokio::task;
 
+mod flume_receiver_stream;
 mod receiver;
-mod sender;
+
+pub type ClientId = String;
+pub type Seq = u64;
 
 #[derive(Builder)]
 #[builder(on(String, into))]
@@ -26,7 +30,7 @@ pub struct SendMessage {
 /// Guarantee of delivery to `orb-relay`
 pub enum QoS {
     AtMostOnce,
-    ExactlyOnce,
+    ExactlyOnce { max_retries: u64, backoff: Duration },
 }
 
 pub struct RecvMessage {
@@ -35,6 +39,10 @@ pub struct RecvMessage {
 }
 
 impl RecvMessage {
+    pub fn new(from: Entity, payload: Vec<u8>) -> Self {
+        Self { from, payload }
+    }
+
     pub async fn reply(&self, payload: impl Into<Vec<u8>>) {}
 }
 
@@ -67,7 +75,9 @@ impl Client {
     }
 
     pub async fn send(&self, msg: SendMessage) {}
-    pub async fn ask(&self, msg: SendMessage) -> Result<RecvMessage, RecvErr> { todo!() }
+    pub async fn ask(&self, msg: SendMessage) -> Result<RecvMessage, RecvErr> {
+        todo!()
+    }
 }
 
 async fn test() {
