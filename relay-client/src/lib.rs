@@ -1,10 +1,16 @@
 use bon::Builder;
+use color_eyre::eyre::{self, Context};
+use derive_more::From;
+use orb_relay_messages::prost_types::Any;
+use orb_relay_messages::relay::RelayConnectRequest;
 use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
-use std::{cmp::Ordering, time::Duration};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
 use tokio::task::{self, JoinHandle};
 
+mod actor;
 mod flume_receiver_stream;
-mod receiver;
 
 pub type ClientId = String;
 pub type Seq = u64;
@@ -48,9 +54,10 @@ impl RecvMessage {
     pub async fn reply(&self, payload: impl Into<Vec<u8>>) {}
 }
 
-#[derive(Debug)]
+#[derive(Debug, From)]
 pub enum RecvErr {
     StreamEnded,
+    Generic(eyre::Error),
 }
 
 pub struct Receiver {
@@ -63,18 +70,19 @@ impl Receiver {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, From)]
 pub enum ClientErr {
-    Todo,
+    Generic(eyre::Error),
 }
 
-#[derive(Debug, Builder)]
+#[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 pub struct Client {
-    opts: ClientOpts,
-    seq: Seq,
+    opts: Arc<ClientOpts>,
+    seq: Arc<AtomicU64>,
     client_rx: flume::Receiver<RecvMessage>,
-    actor_tx: flume::Sender<receiver::Msg>,
+    tonic_tx: flume::Sender<RelayConnectRequest>,
+    actor_tx: flume::Sender<actor::Msg>,
 }
 
 #[derive(Debug, Builder, Clone)]
@@ -105,19 +113,20 @@ impl Client {
         let (tonic_tx, tonic_rx) = flume::unbounded();
         let (client_tx, client_rx) = flume::unbounded();
 
-        let props = receiver::Props {
+        let props = actor::Props {
             client_tx,
-            tonic_tx,
+            tonic_tx: tonic_tx.clone(),
             tonic_rx,
             opts: opts.clone(),
         };
 
-        let (actor_tx, join_handle) = receiver::run(props);
+        let (actor_tx, join_handle) = actor::run(props);
 
         let client = Client {
-            opts,
-            seq: 0,
+            opts: Arc::new(opts),
+            seq: Arc::new(AtomicU64::default()),
             actor_tx,
+            tonic_tx,
             client_rx,
         };
 
@@ -130,9 +139,93 @@ impl Client {
         }
     }
 
-    pub async fn send(&self, msg: SendMessage) {}
+    pub async fn send(&self, msg: SendMessage) -> Result<(), ClientErr> {
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+
+        let payload = RelayPayload {
+            src: Some(Entity {
+                id: self.opts.client_id.clone(),
+                entity_type: self.opts.entity_type as i32,
+                namespace: self.opts.namespace.clone(),
+            }),
+            dst: Some(Entity {
+                id: msg.target_id.clone(),
+                entity_type: msg.target_type as i32,
+                namespace: msg.target_namespace.clone(),
+            }),
+            seq,
+            payload: Some(Any {
+                type_url: "".to_string(),
+                value: msg.data.clone(),
+            }),
+        };
+
+        self.tonic_tx
+            .send(payload.into())
+            .wrap_err("Failed to send message to tonic")?;
+
+        if let QoS::AtLeastOnce = msg.qos {
+            let (ack_tx, ack_rx) = flume::unbounded();
+
+            self.actor_tx
+                .send(actor::Msg::WaitForAck {
+                    original_msg: msg,
+                    ack_tx,
+                    seq,
+                })
+                .wrap_err("Error reaching actor loop")?;
+
+            ack_rx
+                .recv_async()
+                .await
+                .wrap_err("Error when waiting for ack")?;
+        };
+
+        Ok(())
+    }
+
     pub async fn ask(&self, msg: SendMessage) -> Result<RecvMessage, RecvErr> {
-        todo!()
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+
+        let payload = RelayPayload {
+            src: Some(Entity {
+                id: self.opts.client_id.clone(),
+                entity_type: self.opts.entity_type as i32,
+                namespace: self.opts.namespace.clone(),
+            }),
+            dst: Some(Entity {
+                id: msg.target_id.clone(),
+                entity_type: msg.target_type as i32,
+                namespace: msg.target_namespace.clone(),
+            }),
+            seq,
+            payload: Some(Any {
+                type_url: "".to_string(),
+                value: msg.data.clone(),
+            }),
+        };
+
+        self.tonic_tx
+            .send(payload.into())
+            .wrap_err("Failed to send message to tonic")?;
+
+        let (reply_tx, reply_rx) = flume::unbounded();
+
+        self.actor_tx
+            .send(actor::Msg::WaitForReply {
+                from_client: msg.target_id.clone(),
+                seq,
+                recv_msg_tx: reply_tx,
+                qos: msg.qos,
+            })
+            .wrap_err("Error reaching actor loop")?;
+
+        let reply = reply_rx
+            .recv_async()
+            .await
+            .wrap_err("Error when waiting for ack")?;
+
+        Ok(reply)
     }
 }
 
@@ -159,12 +252,6 @@ impl Amount {
             _ => self,
         }
     }
-}
-
-#[derive(Debug)]
-pub struct RetryStrategy {
-    max_retries: u64,
-    timeout: Duration,
 }
 
 async fn test() {

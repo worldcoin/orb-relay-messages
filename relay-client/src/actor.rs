@@ -1,6 +1,6 @@
 use crate::{
-    flume_receiver_stream, Amount, ClientId, ClientOpts, RecvMessage, RetryStrategy,
-    SendMessage, Seq,
+    flume_receiver_stream, Amount, ClientId, ClientOpts, QoS, RecvMessage,
+    RetryStrategy, SendMessage, Seq,
 };
 use color_eyre::eyre::{self, eyre, Context};
 use derive_more::From;
@@ -43,6 +43,7 @@ pub enum Msg {
         from_client: ClientId,
         seq: Seq,
         recv_msg_tx: flume::Sender<RecvMessage>,
+        qos: QoS,
     },
 
     RetryAck {
@@ -179,13 +180,18 @@ fn handle_msg(
             from_client,
             seq,
             recv_msg_tx,
+            qos,
         } => {
             state
                 .pending_replies
                 .insert((from_client.clone(), seq), recv_msg_tx.clone());
 
             let backoff = props.opts.reply_timeout;
-            let retries_left = props.opts.max_message_attempts;
+            let retries_left = match qos {
+                QoS::AtMostOnce => Amount::Val(0),
+                QoS::AtLeastOnce => props.opts.max_message_attempts,
+            };
+
             let tx = relay_actor_tx.clone();
 
             task::spawn(async move {
