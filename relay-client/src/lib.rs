@@ -1,7 +1,7 @@
 use bon::Builder;
-use orb_relay_messages::relay::{entity::EntityType, Entity};
-use std::time::Duration;
-use tokio::task;
+use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
+use std::{cmp::Ordering, time::Duration};
+use tokio::task::{self, JoinHandle};
 
 mod flume_receiver_stream;
 mod receiver;
@@ -9,7 +9,7 @@ mod receiver;
 pub type ClientId = String;
 pub type Seq = u64;
 
-#[derive(Builder)]
+#[derive(Debug, Builder)]
 #[builder(on(String, into))]
 #[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
@@ -28,11 +28,13 @@ pub struct SendMessage {
 }
 
 /// Guarantee of delivery to `orb-relay`
+#[derive(Debug, Copy, Clone)]
 pub enum QoS {
     AtMostOnce,
-    ExactlyOnce { max_retries: u64, backoff: Duration },
+    AtLeastOnce,
 }
 
+#[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
     pub payload: Vec<u8>,
@@ -51,7 +53,10 @@ pub enum RecvErr {
     StreamEnded,
 }
 
-pub struct Receiver;
+pub struct Receiver {
+    client_rx: flume::Receiver<RecvMessage>,
+}
+
 impl Receiver {
     pub async fn recv(&self) -> Result<RecvMessage, RecvErr> {
         todo!()
@@ -63,15 +68,66 @@ pub enum ClientErr {
     Todo,
 }
 
-pub struct Client;
+#[derive(Debug, Builder)]
+#[builder(on(String, into))]
+pub struct Client {
+    opts: ClientOpts,
+    seq: Seq,
+    client_rx: flume::Receiver<RecvMessage>,
+    actor_tx: flume::Sender<receiver::Msg>,
+}
+
+#[derive(Debug, Builder, Clone)]
+#[builder(on(String, into))]
+#[builder(start_fn = entity)]
+pub struct ClientOpts {
+    #[builder(start_fn)]
+    entity_type: EntityType,
+    #[builder(setters(name = id))]
+    client_id: String,
+    namespace: String,
+    domain: String,
+    auth_token: String, // TODO: secrecy
+    #[builder(default = Duration::from_secs(20))]
+    connection_timeout: Duration,
+    #[builder(default = Amount::Infinite)]
+    max_connection_attempts: Amount,
+    #[builder(default = Duration::from_secs(20))]
+    ack_timeout: Duration,
+    #[builder(default = Duration::from_secs(20))]
+    reply_timeout: Duration,
+    #[builder(default = Amount::Infinite)]
+    max_message_attempts: Amount,
+}
 
 impl Client {
-    pub async fn connect(
-        entity_type: EntityType,
-        id: &str,
-        namespace: &str,
-    ) -> Result<(Client, Receiver), ClientErr> {
-        todo!()
+    pub fn connect(opts: ClientOpts) -> (Client, JoinHandle<()>) {
+        let (tonic_tx, tonic_rx) = flume::unbounded();
+        let (client_tx, client_rx) = flume::unbounded();
+
+        let props = receiver::Props {
+            client_tx,
+            tonic_tx,
+            tonic_rx,
+            opts: opts.clone(),
+        };
+
+        let (actor_tx, join_handle) = receiver::run(props);
+
+        let client = Client {
+            opts,
+            seq: 0,
+            actor_tx,
+            client_rx,
+        };
+
+        (client, join_handle)
+    }
+
+    pub fn receiver(&self) -> Receiver {
+        Receiver {
+            client_rx: self.client_rx.clone(),
+        }
     }
 
     pub async fn send(&self, msg: SendMessage) {}
@@ -80,11 +136,48 @@ impl Client {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub enum Amount {
+    Val(u64),
+    Infinite,
+}
+
+impl Amount {
+    pub fn is_nonzero(&self) -> bool {
+        if let Amount::Val(0) = self {
+            return false;
+        };
+
+        true
+    }
+}
+
+impl Amount {
+    pub(crate) fn decrement(self) -> Self {
+        match self {
+            Amount::Val(v) if v > 0 => Amount::Val(v - 1),
+            _ => self,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RetryStrategy {
+    max_retries: u64,
+    timeout: Duration,
+}
+
 async fn test() {
     // will have reconnect options, retry configuration etc
-    let (client, client_rx) = Client::connect(EntityType::App, "123", "cool-namespace")
-        .await
-        .unwrap();
+    let opts = ClientOpts::entity(EntityType::App)
+        .id("id")
+        .namespace("namespace")
+        .auth_token("secret")
+        .domain("dadsa.com")
+        .build();
+
+    let (client, _handle) = Client::connect(opts);
+    let client_rx = client.receiver();
 
     // sending a message without ack form orb-relay
     let msg = SendMessage::to(EntityType::App)
@@ -99,7 +192,7 @@ async fn test() {
     let msg = SendMessage::to(EntityType::App)
         .id("123")
         .namespace("cool-namespace")
-        .qos(QoS::ExactlyOnce)
+        .qos(QoS::AtLeastOnce)
         .payload(b"hi");
 
     client.send(msg).await;
