@@ -273,7 +273,7 @@ impl Client {
 
         let props = actor::Props {
             client_tx,
-            tonic_tx,
+            tonic_tx: tonic_tx.clone(),
             tonic_rx,
             opts: opts.clone(),
         };
@@ -284,6 +284,7 @@ impl Client {
             opts: Arc::new(opts),
             seq: Arc::new(AtomicU64::default()),
             actor_tx,
+            tonic_tx,
             client_rx,
         };
 
