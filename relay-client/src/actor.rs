@@ -71,8 +71,6 @@ pub(crate) enum Msg {
 pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err>>) {
     let (relay_actor_tx, relay_actor_rx) = flume::unbounded();
 
-    // TODO!
-    // relay_actor_tx.send(Heartbeat { seq: 0 }.into());
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
         let mut state = State::default();
