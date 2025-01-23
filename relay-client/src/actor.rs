@@ -22,6 +22,7 @@ pub struct State {
     pending_acks: HashMap<Seq, (SendMessage, flume::Sender<()>)>,
     pending_replies:
         HashMap<(ClientId, Seq), (SendMessage, flume::Sender<RecvdRelayPayload>)>,
+    heartbeat_started: bool,
 }
 
 pub struct Props {
@@ -63,8 +64,6 @@ pub(crate) enum Msg {
 pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err>>) {
     let (relay_actor_tx, relay_actor_rx) = flume::unbounded();
 
-    // TODO!
-    // relay_actor_tx.send(Heartbeat { seq: 0 }.into());
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
         let mut state = State::default();
@@ -114,6 +113,16 @@ async fn main_loop(
         time::timeout(props.opts.connection_timeout, connect(props))
             .await
             .wrap_err("Timed out trying to establish a connection")??;
+
+    if !state.heartbeat_started {
+        state.heartbeat_started = true;
+        let heartbeat = props.opts.heartbeat;
+        let relay_actor_tx = relay_actor_tx.clone();
+        task::spawn(async move {
+            time::sleep(heartbeat).await;
+            let _ = relay_actor_tx.send(Msg::Heartbeat);
+        });
+    }
 
     loop {
         tokio::select! {
@@ -282,7 +291,7 @@ fn handle_msg(
                 .wrap_err("Failed to send heartbeat to Orb Relay Server")?;
 
             let relay_actor_tx = relay_actor_tx.clone();
-            let heartbeat = props.opts.heartbeat_secs;
+            let heartbeat = props.opts.heartbeat;
             task::spawn(async move {
                 time::sleep(heartbeat).await;
                 // TODO: to log or not to log that is the question (yes log dont forget to come here and log plz)
@@ -335,7 +344,8 @@ async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> 
         ..
     } = opts;
 
-    let mut endpoint = Endpoint::from_shared(domain.clone())?.keep_alive_while_idle(true);
+    let mut endpoint =
+        Endpoint::from_shared(domain.clone())?.keep_alive_while_idle(true);
     if domain.starts_with("https://") {
         let tls_config = ClientTlsConfig::new().with_native_roots();
         endpoint = endpoint.tls_config(tls_config)?;

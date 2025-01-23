@@ -163,7 +163,7 @@ pub struct ClientOpts {
     #[builder(default = Duration::from_secs(20))]
     reply_timeout: Duration,
     #[builder(default = Duration::from_secs(30))]
-    heartbeat_secs: Duration,
+    heartbeat: Duration,
     #[builder(default = Amount::Infinite)]
     max_message_attempts: Amount,
 }
@@ -193,8 +193,12 @@ impl Client {
         (client, join_handle)
     }
 
-    pub async fn stop(&self) {
-        todo!()
+    pub async fn stop(&self) -> Result<(), Err> {
+        self.actor_tx
+            .send(actor::Msg::Stop)
+            .wrap_err("actor_tx failed to send Stop message")?;
+
+        Ok(())
     }
 
     pub async fn recv(&self) -> Result<RecvMessage<'_>, Err> {
