@@ -152,7 +152,7 @@ pub struct ClientOpts {
     #[builder(setters(name = id))]
     client_id: String,
     namespace: String,
-    domain: String,
+    endpoint: String,
     auth_token: String, // TODO: secrecy
     #[builder(default = Duration::from_secs(20))]
     connection_timeout: Duration,
@@ -304,65 +304,6 @@ impl Amount {
             _ => self,
         }
     }
-}
-
-async fn test() {
-    // will have reconnect options, retry configuration etc
-    let opts = ClientOpts::entity(EntityType::App)
-        .id("id")
-        .namespace("namespace")
-        .auth_token("secret")
-        .domain("dadsa.com")
-        .build();
-
-    let (client, _handle) = Client::connect(opts);
-    let client_rx = client.clone();
-
-    // sending a message without ack form orb-relay
-    let msg = SendMessage::to(EntityType::App)
-        .id("123")
-        .namespace("cool-namespace")
-        .qos(QoS::AtMostOnce) // this is optional, and default value is QoS::AtMostOnce
-        .payload(b"hi");
-
-    client.send(msg).await.unwrap();
-
-    // sending a message waiting for an ack form orb-relay
-    let msg = SendMessage::to(EntityType::App)
-        .id("123")
-        .namespace("cool-namespace")
-        .qos(QoS::AtLeastOnce)
-        .payload(b"hi");
-
-    client.send(msg).await.unwrap();
-
-    // spawning a thread to listen ot messages
-    task::spawn(async move {
-        while let Ok(msg) = client_rx.recv().await {
-            if msg.from.id == "123" {
-                let payload = String::from_utf8_lossy(&msg.payload);
-
-                if payload == "what is your name" {
-                    msg.reply(b"am i talking to myself", QoS::AtMostOnce)
-                        .await
-                        .unwrap();
-                } else {
-                    println!("got {payload}");
-                }
-            }
-        }
-    });
-
-    // sending an ask message, where we can get a response
-    let msg = SendMessage::to(EntityType::App)
-        .id("123")
-        .namespace("cool-namespace")
-        .payload(b"what is your name");
-
-    let res = client.ask(msg).await.unwrap();
-
-    let res_msg = String::from_utf8_lossy(&res);
-    println!("got {res_msg} from {}", res_msg);
 }
 
 pub(crate) fn relay_payload(

@@ -327,7 +327,7 @@ async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> 
     } = props;
 
     let ClientOpts {
-        domain,
+        endpoint: domain,
         auth_token,
         client_id,
         namespace,
@@ -335,13 +335,13 @@ async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> 
         ..
     } = opts;
 
-    let tls_config = ClientTlsConfig::new().with_native_roots();
+    let mut endpoint = Endpoint::from_shared(domain.clone())?.keep_alive_while_idle(true);
+    if domain.starts_with("https://") {
+        let tls_config = ClientTlsConfig::new().with_native_roots();
+        endpoint = endpoint.tls_config(tls_config)?;
+    }
 
-    let channel = Endpoint::from_shared(format!("https://{}", domain))?
-        .tls_config(tls_config)?
-        .keep_alive_while_idle(true)
-        .connect()
-        .await?;
+    let channel = endpoint.connect().await?;
 
     let mut relay_client = RelayServiceClient::new(channel);
 
