@@ -4,10 +4,9 @@
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
-/// Creates a `tokio_stream::wrappers::ReceiverStream` from a `flume::Receiver<_>` 
+/// Creates a `tokio_stream::wrappers::ReceiverStream` from a `flume::Receiver<_>`
 /// ## example
-/// ```no_run
-/// use crate
+/// ```ignore
 /// let (tx, rx) = fume::unbounded();
 /// let recv_stream = flume_receiver_stream::new(rx.clone(), 4);
 /// ```

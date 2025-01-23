@@ -8,6 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::{self, JoinHandle};
+use tonic::transport;
 
 mod actor;
 mod flume_receiver_stream;
@@ -15,7 +16,7 @@ mod flume_receiver_stream;
 pub type ClientId = String;
 pub type Seq = u64;
 
-#[derive(Debug, Builder)]
+#[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
@@ -40,39 +41,96 @@ pub enum QoS {
     AtLeastOnce,
 }
 
-#[derive(Debug)]
-pub struct RecvMessage {
+pub(crate) struct RecvdRelayPayload {
     pub from: Entity,
     pub payload: Vec<u8>,
+    pub seq: Seq,
 }
 
-impl RecvMessage {
-    pub fn new(from: Entity, payload: Vec<u8>) -> Self {
-        Self { from, payload }
+#[derive(Debug)]
+pub struct RecvMessage<'a> {
+    pub from: Entity,
+    pub payload: Vec<u8>,
+    client: &'a Client,
+    seq: Seq,
+}
+
+impl<'a> RecvMessage<'a> {
+    pub fn new(from: Entity, payload: Vec<u8>, client: &'a Client, seq: Seq) -> Self {
+        Self {
+            from,
+            payload,
+            client,
+            seq,
+        }
     }
 
-    pub async fn reply(&self, payload: impl Into<Vec<u8>>) {}
+    pub async fn reply(
+        &self,
+        payload: impl Into<Vec<u8>>,
+        qos: QoS,
+    ) -> Result<(), Err> {
+        let payload = payload.into();
+        let relay_payload = RelayPayload {
+            src: Some(Entity {
+                id: self.client.opts.client_id.clone(),
+                entity_type: self.client.opts.entity_type as i32,
+                namespace: self.client.opts.namespace.clone(),
+            }),
+            dst: Some(Entity {
+                id: self.from.id.clone(),
+                entity_type: self.from.entity_type as i32,
+                namespace: self.from.namespace.clone(),
+            }),
+            seq: self.seq,
+            payload: Some(Any {
+                type_url: "".to_string(),
+                value: payload.clone(),
+            }),
+        };
+
+        self.client
+            .tonic_tx
+            .send(relay_payload.into())
+            .wrap_err("Failed to send message to tonic")?;
+
+        if let QoS::AtLeastOnce = qos {
+            let (ack_tx, ack_rx) = flume::unbounded();
+
+            self.client
+                .actor_tx
+                .send(actor::Msg::WaitForAck {
+                    original_msg: SendMessage {
+                        target_type: EntityType::try_from(self.from.entity_type)
+                            .wrap_err("Failed to convert EntityType")?,
+                        data: payload,
+                        target_id: self.from.id.clone(),
+                        target_namespace: self.from.namespace.clone(),
+                        qos,
+                    },
+                    ack_tx,
+                    seq: self.seq,
+                })
+                .wrap_err("Error reaching actor loop")?;
+
+            ack_rx
+                .recv_async()
+                .await
+                .wrap_err("Error when waiting for ack")?;
+        };
+
+        Ok(())
+    }
 }
 
-#[derive(Debug, From)]
-pub enum RecvErr {
+#[derive(From, Debug)]
+pub enum Err {
+    StopRequest,
     StreamEnded,
-    Generic(eyre::Error),
-}
-
-pub struct Receiver {
-    client_rx: flume::Receiver<RecvMessage>,
-}
-
-impl Receiver {
-    pub async fn recv(&self) -> Result<RecvMessage, RecvErr> {
-        todo!()
-    }
-}
-
-#[derive(Debug, From)]
-pub enum ClientErr {
-    Generic(eyre::Error),
+    Channel(flume::RecvError),
+    Transport(transport::Error),
+    Tonic(tonic::Status),
+    Other(eyre::Error),
 }
 
 #[derive(Debug, Builder, Clone)]
@@ -80,7 +138,7 @@ pub enum ClientErr {
 pub struct Client {
     opts: Arc<ClientOpts>,
     seq: Arc<AtomicU64>,
-    client_rx: flume::Receiver<RecvMessage>,
+    client_rx: flume::Receiver<RecvdRelayPayload>,
     tonic_tx: flume::Sender<RelayConnectRequest>,
     actor_tx: flume::Sender<actor::Msg>,
 }
@@ -104,12 +162,14 @@ pub struct ClientOpts {
     ack_timeout: Duration,
     #[builder(default = Duration::from_secs(20))]
     reply_timeout: Duration,
+    #[builder(default = Duration::from_secs(30))]
+    heartbeat_secs: Duration,
     #[builder(default = Amount::Infinite)]
     max_message_attempts: Amount,
 }
 
 impl Client {
-    pub fn connect(opts: ClientOpts) -> (Client, JoinHandle<()>) {
+    pub fn connect(opts: ClientOpts) -> (Client, JoinHandle<Result<(), Err>>) {
         let (tonic_tx, tonic_rx) = flume::unbounded();
         let (client_tx, client_rx) = flume::unbounded();
 
@@ -133,32 +193,24 @@ impl Client {
         (client, join_handle)
     }
 
-    pub fn receiver(&self) -> Receiver {
-        Receiver {
-            client_rx: self.client_rx.clone(),
-        }
+    pub async fn stop(&self) {
+        todo!()
     }
 
-    pub async fn send(&self, msg: SendMessage) -> Result<(), ClientErr> {
-        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+    pub async fn recv(&self) -> Result<RecvMessage<'_>, Err> {
+        let msg = self.client_rx.recv_async().await?;
 
-        let payload = RelayPayload {
-            src: Some(Entity {
-                id: self.opts.client_id.clone(),
-                entity_type: self.opts.entity_type as i32,
-                namespace: self.opts.namespace.clone(),
-            }),
-            dst: Some(Entity {
-                id: msg.target_id.clone(),
-                entity_type: msg.target_type as i32,
-                namespace: msg.target_namespace.clone(),
-            }),
-            seq,
-            payload: Some(Any {
-                type_url: "".to_string(),
-                value: msg.data.clone(),
-            }),
-        };
+        Ok(RecvMessage {
+            from: msg.from,
+            payload: msg.payload,
+            client: self,
+            seq: msg.seq,
+        })
+    }
+
+    pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+        let payload = relay_payload(&self.opts, &msg, seq);
 
         self.tonic_tx
             .send(payload.into())
@@ -184,26 +236,9 @@ impl Client {
         Ok(())
     }
 
-    pub async fn ask(&self, msg: SendMessage) -> Result<RecvMessage, RecvErr> {
+    pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
-
-        let payload = RelayPayload {
-            src: Some(Entity {
-                id: self.opts.client_id.clone(),
-                entity_type: self.opts.entity_type as i32,
-                namespace: self.opts.namespace.clone(),
-            }),
-            dst: Some(Entity {
-                id: msg.target_id.clone(),
-                entity_type: msg.target_type as i32,
-                namespace: msg.target_namespace.clone(),
-            }),
-            seq,
-            payload: Some(Any {
-                type_url: "".to_string(),
-                value: msg.data.clone(),
-            }),
-        };
+        let payload = relay_payload(&self.opts, &msg, seq);
 
         self.tonic_tx
             .send(payload.into())
@@ -213,10 +248,9 @@ impl Client {
 
         self.actor_tx
             .send(actor::Msg::WaitForReply {
-                from_client: msg.target_id.clone(),
-                seq,
+                original_msg: msg,
                 recv_msg_tx: reply_tx,
-                qos: msg.qos,
+                seq,
             })
             .wrap_err("Error reaching actor loop")?;
 
@@ -225,7 +259,7 @@ impl Client {
             .await
             .wrap_err("Error when waiting for ack")?;
 
-        Ok(reply)
+        Ok(reply.payload)
     }
 }
 
@@ -233,6 +267,24 @@ impl Client {
 pub enum Amount {
     Val(u64),
     Infinite,
+}
+
+impl PartialEq<u64> for Amount {
+    fn eq(&self, other: &u64) -> bool {
+        match self {
+            Amount::Val(v) => v == other,
+            Amount::Infinite => false,
+        }
+    }
+}
+
+impl PartialOrd<u64> for Amount {
+    fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
+        match self {
+            Amount::Val(v) => v.partial_cmp(other),
+            Amount::Infinite => Some(std::cmp::Ordering::Greater),
+        }
+    }
 }
 
 impl Amount {
@@ -264,7 +316,7 @@ async fn test() {
         .build();
 
     let (client, _handle) = Client::connect(opts);
-    let client_rx = client.receiver();
+    let client_rx = client.clone();
 
     // sending a message without ack form orb-relay
     let msg = SendMessage::to(EntityType::App)
@@ -273,7 +325,7 @@ async fn test() {
         .qos(QoS::AtMostOnce) // this is optional, and default value is QoS::AtMostOnce
         .payload(b"hi");
 
-    client.send(msg).await;
+    client.send(msg).await.unwrap();
 
     // sending a message waiting for an ack form orb-relay
     let msg = SendMessage::to(EntityType::App)
@@ -282,7 +334,7 @@ async fn test() {
         .qos(QoS::AtLeastOnce)
         .payload(b"hi");
 
-    client.send(msg).await;
+    client.send(msg).await.unwrap();
 
     // spawning a thread to listen ot messages
     task::spawn(async move {
@@ -291,7 +343,9 @@ async fn test() {
                 let payload = String::from_utf8_lossy(&msg.payload);
 
                 if payload == "what is your name" {
-                    msg.reply(b"am i talking to myself").await;
+                    msg.reply(b"am i talking to myself", QoS::AtMostOnce)
+                        .await
+                        .unwrap();
                 } else {
                     println!("got {payload}");
                 }
@@ -306,6 +360,31 @@ async fn test() {
         .payload(b"what is your name");
 
     let res = client.ask(msg).await.unwrap();
-    let res_msg = String::from_utf8_lossy(&res.payload);
-    println!("got {res_msg} from {}", res.from.id);
+
+    let res_msg = String::from_utf8_lossy(&res);
+    println!("got {res_msg} from {}", res_msg);
+}
+
+pub(crate) fn relay_payload(
+    opts: &ClientOpts,
+    msg: &SendMessage,
+    seq: Seq,
+) -> RelayPayload {
+    RelayPayload {
+        src: Some(Entity {
+            id: opts.client_id.clone(),
+            entity_type: opts.entity_type as i32,
+            namespace: opts.namespace.clone(),
+        }),
+        dst: Some(Entity {
+            id: msg.target_id.clone(),
+            entity_type: msg.target_type as i32,
+            namespace: msg.target_namespace.clone(),
+        }),
+        seq,
+        payload: Some(Any {
+            type_url: "".to_string(),
+            value: msg.data.clone(),
+        }),
+    }
 }

@@ -20,3 +20,7 @@ tracing.workspace = true
 flume.workspace = true
 bon.workspace = true
 secrecy.workspace = true
+
+[dev-dependencies]
+async-stream.workspace = true
+orb-relay-messages = { workspace = true, features = ["client", "server"] }
