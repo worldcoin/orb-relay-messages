@@ -71,6 +71,8 @@ pub(crate) enum Msg {
 pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err>>) {
     let (relay_actor_tx, relay_actor_rx) = flume::unbounded();
 
+    // TODO!
+    // relay_actor_tx.send(Heartbeat { seq: 0 }.into());
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
         let mut state = State::default();
@@ -292,9 +294,9 @@ fn handle_msg(
                     .send(payload.into())
                     .wrap_err("Failed to send retry message to tonic_tx")?;
 
-                let backoff = props.opts.reply_timeout;
-                let retries_left = props.opts.max_message_attempts;
-                let tx = relay_actor_tx.clone();
+                    let backoff = props.opts.reply_timeout;
+                    let retries_left = props.opts.max_message_attempts;
+                    let tx = relay_actor_tx.clone();
 
                 task::spawn(async move {
                     time::sleep(backoff).await;
