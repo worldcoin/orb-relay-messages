@@ -3,30 +3,25 @@ use orb_relay_messages::relay::{
     relay_service_server::{RelayService, RelayServiceServer},
     Ack, ConnectResponse, RelayConnectRequest, RelayConnectResponse, RelayPayload,
 };
-use std::{future, net::SocketAddr, pin::Pin, str::FromStr};
+use std::{net::SocketAddr, pin::Pin};
 use tokio::net::TcpListener;
-use tokio_stream::{wrappers::TcpListenerStream, Stream};
+use tokio_stream::{wrappers::TcpListenerStream, Stream, StreamExt};
 use tonic::{transport::Server, Request, Response, Status, Streaming};
 
 type OutboundMessageStream =
     Pin<Box<dyn Stream<Item = Result<RelayConnectResponse, Status>> + Send>>;
 
-struct RelayServiceHandler<T: IntoRelayConnectResponse>(
+struct RelayServiceHandler<T: IntoRelayConnectResponse + Sized>(
     Box<
-        dyn Fn() -> Box<
-                dyn FnMut(
-                        RelayConnectRequest,
-                    )
-                        -> Pin<Box<dyn future::Future<Output = T> + Send>>
-                    + Send,
-            > + Send
+        dyn Fn(Streaming<RelayConnectRequest>) -> Pin<Box<dyn Stream<Item = T> + Send>>
+            + Send
             + Sync
             + 'static,
     >,
 );
 
 #[tonic::async_trait]
-impl<T: IntoRelayConnectResponse + Send + 'static> RelayService
+impl<T: IntoRelayConnectResponse + Send + Sync + 'static> RelayService
     for RelayServiceHandler<T>
 {
     type RelayConnectStream = OutboundMessageStream;
@@ -35,15 +30,13 @@ impl<T: IntoRelayConnectResponse + Send + 'static> RelayService
         &self,
         request: Request<Streaming<RelayConnectRequest>>,
     ) -> Result<Response<Self::RelayConnectStream>, Status> {
-        let mut handler = (self.0)();
-        let mut stream = request.into_inner();
+        let stream = request.into_inner();
+        let handler_stream = (self.0)(stream);
 
-        let output = async_stream::stream! {
-            let msg = stream.message().await.unwrap().unwrap();
-            yield Ok(handler(msg).await.into_relay_connect_response());
-        };
+        let output =
+            Box::pin(handler_stream.map(|item| Ok(item.into_relay_connect_response())));
 
-        Ok(Response::new(Box::pin(output) as Self::RelayConnectStream))
+        Ok(Response::new(output))
     }
 }
 
@@ -59,59 +52,23 @@ impl Drop for TestServer {
 }
 
 impl TestServer {
-    /// Creates a new relay service that handles relay connect requests for testing.
-    /// Uses flume channels for shutdown signaling.
-    ///
-    /// Given closure is called on every new connection, and the inner `FnMut()` called on every received [`RelayConnectRequest`] for that connection.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let server = TestServer::new(|| {
-    ///     let mut state = 0;
-    ///     |relay_conn_request| async move {
-    ///         println!("received msg number: {state}");
-    ///         state += 1;
-    ///         ConnectResponse {
-    ///             client_id: "bla".to_string(),
-    ///             success: true,
-    ///             error: String::default(),
-    ///         }
-    ///     }
-    /// }).await;
-    /// ```
-    pub async fn new<F, H, Fut, T>(handler: F) -> TestServer
+    pub async fn new<F, T, S>(handler: F) -> TestServer
     where
-        F: Fn() -> H + Send + Sync + 'static,
-        H: FnMut(RelayConnectRequest) -> Fut + Send + 'static,
-        Fut: future::Future<Output = T> + Send + 'static,
-        T: IntoRelayConnectResponse + Send + 'static,
+        F: Fn(Streaming<RelayConnectRequest>) -> S,
+        F: Send + Sync + 'static,
+        S: Stream<Item = T> + Send + 'static,
+        T: IntoRelayConnectResponse + Send + Sync + 'static,
     {
-        let handler = move || {
-            let mut inner_handler = (handler)();
-            let boxed: Box<
-                dyn FnMut(
-                        RelayConnectRequest,
-                    )
-                        -> Pin<Box<dyn future::Future<Output = T> + Send>>
-                    + Send,
-            > = Box::new(move |req| {
-                let fut = inner_handler(req);
-                let pinned: Pin<Box<dyn future::Future<Output = T> + Send>> =
-                    Box::pin(fut);
-                pinned
-            });
-            boxed
-        };
-
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().map_err(Box::new).unwrap();
         let (tx, rx) = flume::bounded(1);
 
+        let wrapped_handler = move |stream| Box::pin(handler(stream)) as Pin<Box<dyn Stream<Item = T> + Send>>;
+
         tokio::spawn(
             Server::builder()
                 .add_service(RelayServiceServer::new(RelayServiceHandler(Box::new(
-                    handler,
+                    wrapped_handler,
                 ))))
                 .serve_with_incoming_shutdown(
                     TcpListenerStream::new(listener),
