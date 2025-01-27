@@ -10,7 +10,7 @@ use orb_relay_messages::{
         ConnectResponse, Entity, RelayPayload,
     },
 };
-use relay_client::{Amount, Client, ClientOpts, QoS, SendMessage};
+use orb_relay_client::{Amount, Client, ClientOpts, QoS, SendMessage};
 use std::{time::Duration, u64};
 use test_server::{IntoRes, TestServer};
 use tokio::time;

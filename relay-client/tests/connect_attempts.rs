@@ -6,7 +6,7 @@ mod test_server;
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use relay_client::{Amount, Client, ClientOpts};
+use orb_relay_client::{Amount, Client, ClientOpts};
 use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::time;

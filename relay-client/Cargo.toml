@@ -1,5 +1,5 @@
 [package]
-name = "relay-client"
+name = "orb-relay-client"
 version = "0.0.1"
 description = """
 relay-client for communicate with other relay-cients through orb-relay-service
