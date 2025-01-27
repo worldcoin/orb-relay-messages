@@ -1,6 +1,6 @@
 use orb_relay_messages::relay::{
     relay_connect_request,
-    relay_connect_response::{self, Msg},
+    relay_connect_response::Msg,
     relay_service_server::{RelayService, RelayServiceServer},
     Ack, ConnectResponse, RelayConnectRequest, RelayConnectResponse, RelayPayload,
 };
@@ -21,10 +21,7 @@ where
 {
     state: Arc<Mutex<S>>,
     handler: Arc<
-        dyn Fn(
-                &mut S,
-                relay_connect_request::Msg,
-            ) -> Option<RelayConnectResponse>
+        dyn Fn(&mut S, relay_connect_request::Msg) -> Option<RelayConnectResponse>
             + Send
             + Sync
             + 'static,
@@ -60,6 +57,10 @@ where
     }
 }
 
+/// A test server that spawns a real gRPC server instance.
+/// This server will listen on a random local port and can be used
+/// for integration testing of gRPC clients. The server runs in a
+/// separate tokio task and will be shut down when this struct is dropped.
 pub struct TestServer<S> {
     addr: SocketAddr,
     state: Arc<Mutex<S>>,
@@ -76,12 +77,37 @@ impl<S> TestServer<S>
 where
     S: Sync + Send + 'static,
 {
+    /// Creates a new `TestServer` with an initial state and handler function.
+    ///
+    /// The handler receives mutable access to the server state and each incoming request message.
+    /// It can modify the state and returns an optional response message.
+    ///
+    /// The server's state can be accessed at any time by calling `self.state()`, which returns
+    /// a MutexGuard containing the state.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let initial_state = 0;
+    /// let sv = TestServer::new(initial_state, |state, conn_req| {
+    ///     *state += 1;
+    ///     match conn_req {
+    ///         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
+    ///             client_id: client_id.unwrap().id.clone(),
+    ///             success: true,
+    ///             error: "nothing".to_string(),
+    ///         }
+    ///         .into_res(),
+    ///
+    ///         _ => None,
+    ///     }
+    /// })
+    /// .await;
+    ///
+    /// let state = sv.state().await;
+    /// ```
     pub async fn new<F>(state: S, handler: F) -> Self
     where
-        F: Fn(
-                &mut S,
-                relay_connect_request::Msg,
-            ) -> Option<RelayConnectResponse>
+        F: Fn(&mut S, relay_connect_request::Msg) -> Option<RelayConnectResponse>
             + Send
             + Sync
             + 'static,
@@ -114,10 +140,12 @@ where
         }
     }
 
+    /// Gets the server's random TCP socket address
     pub fn addr(&self) -> SocketAddr {
         self.addr
     }
 
+    /// Returns a mutex guard that can be used to access and modify the server's state
     pub async fn state(&self) -> MutexGuard<'_, S> {
         self.state.lock().await
     }

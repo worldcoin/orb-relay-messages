@@ -273,7 +273,7 @@ impl Client {
 
         let props = actor::Props {
             client_tx,
-            tonic_tx: tonic_tx.clone(),
+            tonic_tx,
             tonic_rx,
             opts: opts.clone(),
         };
@@ -284,7 +284,6 @@ impl Client {
             opts: Arc::new(opts),
             seq: Arc::new(AtomicU64::default()),
             actor_tx,
-            tonic_tx,
             client_rx,
         };
 
@@ -401,6 +400,7 @@ impl Client {
     /// println!("Got response: {:?}", response);
     /// ```
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
+        println!("[CLIENT] asking");
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 
