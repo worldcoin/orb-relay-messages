@@ -2,7 +2,6 @@ use bon::Builder;
 use color_eyre::eyre::{self, Context};
 use derive_more::From;
 use orb_relay_messages::prost_types::Any;
-use orb_relay_messages::relay::RelayConnectRequest;
 use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -239,7 +238,6 @@ impl Client {
     }
 
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
-        println!("[CLIENT] asking");
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 

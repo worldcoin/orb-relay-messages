@@ -32,6 +32,7 @@ pub struct Props {
     pub tonic_rx: flume::Receiver<RelayConnectRequest>,
 }
 
+#[derive(Debug)]
 pub(crate) enum Msg {
     RelayResponse(relay_connect_response::Msg),
 
@@ -371,6 +372,7 @@ async fn connect(
 
     let mut endpoint =
         Endpoint::from_shared(domain.clone())?.keep_alive_while_idle(true);
+
     if domain.starts_with("https://") {
         let tls_config = ClientTlsConfig::new().with_native_roots();
         endpoint = endpoint.tls_config(tls_config)?;
