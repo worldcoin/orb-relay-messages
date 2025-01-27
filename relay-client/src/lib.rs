@@ -400,7 +400,6 @@ impl Client {
     /// println!("Got response: {:?}", response);
     /// ```
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
-        println!("[CLIENT] asking");
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 
