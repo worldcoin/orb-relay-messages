@@ -18,7 +18,7 @@ use tokio::time;
 #[tokio::test]
 async fn sends_at_most_once_and_increases_seq() {
     // Arrange
-    let sv = TestServer::new(vec![], |state, conn_req| match conn_req {
+    let sv = TestServer::new(vec![], |state, conn_req, _| match conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.unwrap().id.clone(),
             success: true,
@@ -106,7 +106,7 @@ async fn sends_at_most_once_and_increases_seq() {
 async fn sends_at_least_once_retrying_until_ack_is_received() {
     // Arrange
     let max_attempts = 3;
-    let sv = TestServer::new(vec![], move |state, conn_req| match conn_req {
+    let sv = TestServer::new(vec![], move |state, conn_req, _| match conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.unwrap().id.clone(),
             success: true,

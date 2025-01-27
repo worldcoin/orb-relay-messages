@@ -12,7 +12,7 @@ use tokio::time;
 #[tokio::test]
 async fn it_sends_heartbeat_periodically() {
     // Arrange
-    let sv = TestServer::new(0, |heartbeats, conn_req| match conn_req {
+    let sv = TestServer::new(0, |heartbeats, conn_req, _| match conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.unwrap().id.clone(),
             success: true,

@@ -18,7 +18,7 @@ use tokio::time;
 #[tokio::test]
 async fn asks_at_most_once() {
     // Arrange
-    let sv = TestServer::new(vec![], move |state, conn_req| match &conn_req {
+    let sv = TestServer::new(vec![], move |state, conn_req, _| match &conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.as_ref().unwrap().id.clone(),
             success: true,
@@ -101,7 +101,7 @@ async fn asks_at_most_once() {
 async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
     // Arrange
     let max_attempts = 3;
-    let sv = TestServer::new(vec![], move |state, conn_req| match &conn_req {
+    let sv = TestServer::new(vec![], move |state, conn_req, _| match &conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.as_ref().unwrap().id.clone(),
             success: true,
@@ -187,7 +187,7 @@ async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
 #[tokio::test]
 async fn ask_increases_seq() {
     // Arrange
-    let sv = TestServer::new(vec![], move |state, conn_req| match &conn_req {
+    let sv = TestServer::new(vec![], move |state, conn_req, _| match &conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.as_ref().unwrap().id.clone(),
             success: true,

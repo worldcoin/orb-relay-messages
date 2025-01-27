@@ -362,12 +362,15 @@ impl Client {
     ///
     /// # Example
     /// ```ignore
+    /// // Send message and wait for response
     /// let response = client.ask(
     ///     SendMessage::to(EntityType::Orb)
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .payload("what is your status?")
     /// ).await?;
+    ///
+    /// println!("Got response: {:?}", response);
     /// ```
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);

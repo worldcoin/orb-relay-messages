@@ -14,7 +14,7 @@ use tokio::time;
 #[tokio::test]
 async fn connects() {
     // Arrange
-    let sv = TestServer::new((false, 0), |state, conn_req| {
+    let sv = TestServer::new((false, 0), |state, conn_req, _| {
         if let Msg::ConnectRequest(ConnectRequest { client_id, .. }) = conn_req {
             state.0 = true;
             state.1 += 1;
@@ -54,7 +54,7 @@ async fn connects() {
 async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
     // Arrange
     let expected_attempts = 2;
-    let sv = TestServer::new(0, |attempts, _conn_req| {
+    let sv = TestServer::new(0, |attempts, _conn_req, _| {
         *attempts += 1;
         ConnectResponse {
             client_id: "doesntmatter".to_string(),

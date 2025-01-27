@@ -1,18 +1,17 @@
 mod test_server;
 
-use std::time::Duration;
-
+use orb_relay_client::{Amount, Client, ClientOpts, Err, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use orb_relay_client::{Amount, Client, ClientOpts, Err, SendMessage};
+use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::time;
 
 #[tokio::test]
 async fn it_stops_sever_when_stop_is_called() {
     // Arrange
-    let sv = TestServer::new(0, |msg_count, conn_req| {
+    let sv = TestServer::new(0, |msg_count, conn_req, _| {
         *msg_count += 1;
 
         match conn_req {
