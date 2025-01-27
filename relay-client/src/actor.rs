@@ -321,8 +321,9 @@ fn handle_msg(
             let heartbeat = props.opts.heartbeat;
             task::spawn(async move {
                 time::sleep(heartbeat).await;
-                // TODO: to log or not to log that is the question (yes log dont forget to come here and log plz)
-                let _ = relay_actor_tx.send(Msg::Heartbeat);
+                if let Err(_) = relay_actor_tx.send(Msg::Heartbeat) {
+                    error!("Failed to send heartbeat as relay_actor_rx seems to have been dropped.");
+                }
             });
         }
     }
@@ -338,7 +339,9 @@ fn handle_payload(
 ) -> color_eyre::Result<()> {
     let key = (recv_msg.from.id.clone(), seq);
     if let Some((_msg, reply)) = state.pending_replies.remove(&key) {
-        let _ = reply.send(recv_msg); // TODO: should we care about this error?
+        if let Err(_) = reply.send(recv_msg) {
+            error!("Failed to send reply from message with seq {seq}. Seems like scope containing .ask call was dropped.");
+        }
     } else {
         client_tx
             .send(recv_msg)
