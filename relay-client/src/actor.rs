@@ -292,9 +292,9 @@ fn handle_msg(
                     .send(payload.into())
                     .wrap_err("Failed to send retry message to tonic_tx")?;
 
-                    let backoff = props.opts.reply_timeout;
-                    let retries_left = props.opts.max_message_attempts;
-                    let tx = relay_actor_tx.clone();
+                let backoff = props.opts.reply_timeout;
+                let retries_left = props.opts.max_message_attempts;
+                let tx = relay_actor_tx.clone();
 
                 task::spawn(async move {
                     time::sleep(backoff).await;
