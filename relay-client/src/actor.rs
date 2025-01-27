@@ -6,7 +6,7 @@ use color_eyre::eyre::{eyre, Context};
 use orb_relay_messages::relay::{
     connect_request::AuthMethod, relay_connect_request, relay_connect_response,
     relay_service_client::RelayServiceClient, Ack, ConnectRequest, ConnectResponse,
-    Entity, Heartbeat, RelayConnectRequest, RelayConnectResponse, RelayPayload,
+    Entity, RelayConnectRequest, RelayConnectResponse, RelayPayload,
 };
 use std::collections::HashMap;
 use tokio::{task, time};
@@ -15,7 +15,7 @@ use tonic::{
     transport::{ClientTlsConfig, Endpoint},
     Streaming,
 };
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 #[derive(Default)]
 pub struct State {
@@ -33,6 +33,10 @@ pub struct Props {
 }
 
 pub(crate) enum Msg {
+    RelayResponse(relay_connect_response::Msg),
+
+    Send(RelayConnectRequest),
+
     WaitForAck {
         original_msg: SendMessage,
         ack_tx: flume::Sender<()>,
@@ -109,10 +113,12 @@ async fn main_loop(
     relay_actor_tx: flume::Sender<Msg>,
     relay_actor_rx: flume::Receiver<Msg>,
 ) -> Result<(), Err> {
-    let mut response_stream =
-        time::timeout(props.opts.connection_timeout, connect(props))
-            .await
-            .wrap_err("Timed out trying to establish a connection")??;
+    let mut response_stream = time::timeout(
+        props.opts.connection_timeout,
+        connect(props, &relay_actor_tx),
+    )
+    .await
+    .wrap_err("Timed out trying to establish a connection")??;
 
     if !state.heartbeat_started {
         state.heartbeat_started = true;
@@ -125,41 +131,28 @@ async fn main_loop(
     }
 
     loop {
-        tokio::select! {
+        let msg = tokio::select! {
             biased;
 
             msg = relay_actor_rx.recv_async() => {
-                let msg = msg.wrap_err("relay_actor_tx seemingly dropped")?;
-                handle_msg(state, props, msg, &relay_actor_tx)?;
-
+                msg.map(Some)
+                   .wrap_err("relay_actor_tx seemingly dropped")?
             }
 
-            Some(message) = response_stream.next() => {
-                match message?.msg {
-                    Some(relay_connect_response::Msg::Payload(RelayPayload {
-                        payload: Some(payload),
-                        src: Some(entity),
-                        seq,
-                        ..
-                    })) => {
-
-                        let recv_msg = RecvdRelayPayload { from: entity, payload: payload.value , seq };
-                        handle_payload(state, recv_msg, seq, &props.client_tx)?;
-                    }
-
-                    Some(relay_connect_response::Msg::Ack(Ack { seq })) => handle_ack(state, seq),
-
-                    Some(other_msg) => {
-                        debug!(" Received a non-Any message: {:?}", other_msg)
-                    }
-
-                    None => (),
-                }
+            message = response_stream.next() => {
+                message.ok_or(Err::StreamEnded)?
+                    .map(|msg|msg.msg)?
+                    .map(Msg::RelayResponse)
             }
+        };
+
+        if let Some(msg) = msg {
+            handle_msg(state, props, msg, &relay_actor_tx)?;
         }
     }
 }
 
+/// This loop only runs if we have a connection.
 fn handle_msg(
     state: &mut State,
     props: &Props,
@@ -167,6 +160,35 @@ fn handle_msg(
     relay_actor_tx: &flume::Sender<Msg>,
 ) -> Result<(), Err> {
     match msg {
+        Msg::RelayResponse(relay_connect_response::Msg::Payload(RelayPayload {
+            payload: Some(payload),
+            src: Some(entity),
+            seq,
+            ..
+        })) => {
+            let recv_msg = RecvdRelayPayload {
+                from: entity,
+                payload: payload.value,
+                seq,
+            };
+            handle_payload(state, recv_msg, seq, &props.client_tx)?;
+        }
+
+        Msg::RelayResponse(relay_connect_response::Msg::Ack(Ack { seq })) => {
+            handle_ack(state, seq)
+        }
+
+        Msg::RelayResponse(other_msg) => {
+            debug!(" Received a non-Any message: {:?}", other_msg)
+        }
+
+        Msg::Send(payload) => {
+            props
+                .tonic_tx
+                .send(payload)
+                .wrap_err("Failed to send a payload to tonic_tx")?;
+        }
+
         Msg::Stop => return Err(Err::StopRequest),
 
         Msg::WaitForAck {
@@ -327,7 +349,10 @@ fn handle_ack(state: &mut State, seq: Seq) {
     };
 }
 
-async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> {
+async fn connect(
+    props: &Props,
+    relay_actor_tx: &flume::Sender<Msg>,
+) -> Result<Streaming<RelayConnectResponse>, Err> {
     let Props {
         opts,
         tonic_tx,
@@ -379,7 +404,7 @@ async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> 
                 success: true,
                 ..
             })) => {
-                debug!("Connection established successfully.");
+                info!("Connection established successfully.");
                 break;
             }
 
@@ -387,12 +412,13 @@ async fn connect(props: &Props) -> Result<Streaming<RelayConnectResponse>, Err> 
                 success: false,
                 ..
             })) => {
-                debug!("Failed to establish connection.");
                 return Err(eyre!("Failed to establish connection.").into());
             }
 
-            Some(other_msg) => {
-                debug!(" Received unexpected message: {:?}", other_msg);
+            Some(msg) => {
+                relay_actor_tx
+                    .send(Msg::RelayResponse(msg))
+                    .wrap_err("relay_actor_tx receivers unexpectedly dropped")?;
             }
 
             None => (),

@@ -7,7 +7,7 @@ use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::task::{self, JoinHandle};
+use tokio::task::JoinHandle;
 use tonic::transport;
 
 mod actor;
@@ -90,8 +90,8 @@ impl<'a> RecvMessage<'a> {
         };
 
         self.client
-            .tonic_tx
-            .send(relay_payload.into())
+            .actor_tx
+            .send(actor::Msg::Send(relay_payload.into()))
             .wrap_err("Failed to send message to tonic")?;
 
         if let QoS::AtLeastOnce = qos {
@@ -139,7 +139,6 @@ pub struct Client {
     opts: Arc<ClientOpts>,
     seq: Arc<AtomicU64>,
     client_rx: flume::Receiver<RecvdRelayPayload>,
-    tonic_tx: flume::Sender<RelayConnectRequest>,
     actor_tx: flume::Sender<actor::Msg>,
 }
 
@@ -175,7 +174,7 @@ impl Client {
 
         let props = actor::Props {
             client_tx,
-            tonic_tx: tonic_tx.clone(),
+            tonic_tx,
             tonic_rx,
             opts: opts.clone(),
         };
@@ -186,7 +185,6 @@ impl Client {
             opts: Arc::new(opts),
             seq: Arc::new(AtomicU64::default()),
             actor_tx,
-            tonic_tx,
             client_rx,
         };
 
@@ -216,8 +214,8 @@ impl Client {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 
-        self.tonic_tx
-            .send(payload.into())
+        self.actor_tx
+            .send(actor::Msg::Send(payload.into()))
             .wrap_err("Failed to send message to tonic")?;
 
         if let QoS::AtLeastOnce = msg.qos {
@@ -241,11 +239,12 @@ impl Client {
     }
 
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
+        println!("[CLIENT] asking");
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 
-        self.tonic_tx
-            .send(payload.into())
+        self.actor_tx
+            .send(actor::Msg::Send(payload.into()))
             .wrap_err("Failed to send message to tonic")?;
 
         let (reply_tx, reply_rx) = flume::unbounded();
