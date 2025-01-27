@@ -239,29 +239,31 @@ fn handle_msg(
 
         Msg::RetryAck { seq, retries_left } => {
             if let Some((msg, _sender)) = state.pending_acks.get(&seq) {
-                if retries_left.is_nonzero() {
-                    let payload = relay_payload(&props.opts, msg, seq);
-                    props
-                        .tonic_tx
-                        .send(payload.into())
-                        .wrap_err("Failed to send retry message to tonic_tx")?;
-
-                    let backoff = props.opts.ack_timeout;
-                    let retries_left = props.opts.max_message_attempts;
-                    let tx = relay_actor_tx.clone();
-
-                    task::spawn(async move {
-                        time::sleep(backoff).await;
-                        let _ = tx.send(Msg::RetryAck {
-                            seq,
-                            retries_left: retries_left.decrement(),
-                        });
-                    });
-                } else {
+                if retries_left.is_zero() {
                     error!(
                         "Failed to send message with seq {seq} after multiple retries."
                     );
+
+                    return Ok(());
                 }
+
+                let payload = relay_payload(&props.opts, msg, seq);
+                props
+                    .tonic_tx
+                    .send(payload.into())
+                    .wrap_err("Failed to send retry message to tonic_tx")?;
+
+                let backoff = props.opts.ack_timeout;
+                let retries_left = props.opts.max_message_attempts;
+                let tx = relay_actor_tx.clone();
+
+                task::spawn(async move {
+                    time::sleep(backoff).await;
+                    let _ = tx.send(Msg::RetryAck {
+                        seq,
+                        retries_left: retries_left.decrement(),
+                    });
+                });
             }
         }
 
@@ -273,30 +275,32 @@ fn handle_msg(
             if let Some((msg, _sender)) =
                 state.pending_replies.get(&(from_client.clone(), seq))
             {
-                if retries_left.is_nonzero() {
-                    let payload = relay_payload(&props.opts, msg, seq);
-                    props
-                        .tonic_tx
-                        .send(payload.into())
-                        .wrap_err("Failed to send retry message to tonic_tx")?;
-
-                    let backoff = props.opts.reply_timeout;
-                    let retries_left = props.opts.max_message_attempts;
-                    let tx = relay_actor_tx.clone();
-
-                    task::spawn(async move {
-                        time::sleep(backoff).await;
-                        let _ = tx.send(Msg::RetryAsk {
-                            from_client,
-                            seq,
-                            retries_left: retries_left.decrement(),
-                        });
-                    });
-                } else {
+                if retries_left.is_zero() {
                     error!(
                         "Failed to send message with seq {seq} after multiple retries."
                     );
+
+                    return Ok(());
                 }
+
+                let payload = relay_payload(&props.opts, msg, seq);
+                props
+                    .tonic_tx
+                    .send(payload.into())
+                    .wrap_err("Failed to send retry message to tonic_tx")?;
+
+                let backoff = props.opts.reply_timeout;
+                let retries_left = props.opts.max_message_attempts;
+                let tx = relay_actor_tx.clone();
+
+                task::spawn(async move {
+                    time::sleep(backoff).await;
+                    let _ = tx.send(Msg::RetryAsk {
+                        from_client,
+                        seq,
+                        retries_left: retries_left.decrement(),
+                    });
+                });
             }
         }
 

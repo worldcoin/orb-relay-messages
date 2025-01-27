@@ -9,7 +9,10 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tonic::transport;
 
+pub use amount::Amount;
+
 mod actor;
+mod amount;
 mod flume_receiver_stream;
 
 pub type ClientId = String;
@@ -33,7 +36,9 @@ pub struct SendMessage {
     qos: QoS,
 }
 
-/// Guarantee of delivery to `orb-relay`
+/// QoS delivery guarantees:
+/// - AtMostOnce: Single send attempt without guarantees
+/// - AtLeastOnce: Guaranteed delivery with retries (configurable via max_message_attempts) and acks
 #[derive(Debug, Copy, Clone)]
 pub enum QoS {
     AtMostOnce,
@@ -64,6 +69,20 @@ impl<'a> RecvMessage<'a> {
         }
     }
 
+    /// Reply to the sender of this message with a payload and specified QoS level.
+    ///
+    /// # Example
+    /// ```ignore
+    /// async fn handle_message(client: &Client) {
+    ///     while let Ok(msg) = client.recv().await {
+    ///         // Reply with "hello" using at-most-once delivery
+    ///         msg.reply("hello", QoS::AtMostOnce).await.unwrap();
+    ///
+    ///         // Reply with bytes using at-least-once delivery
+    ///         msg.reply(vec![1, 2, 3], QoS::AtLeastOnce).await.unwrap();
+    ///     }
+    /// }
+    /// ```
     pub async fn reply(
         &self,
         payload: impl Into<Vec<u8>>,
@@ -134,6 +153,22 @@ pub enum Err {
 
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
+/// A client for sending and receiving messages through a `orb-relay` using message queues.
+///
+/// # Example
+/// ```ignore
+/// use orb_relay_client::{Client, ClientOpts};
+///
+/// let opts = ClientOpts::entity()
+///     .entity_type(EntityType::Device)
+///     .id("device_1")
+///     .namespace("default")
+///     .endpoint("http://localhost:8080")
+///     .auth_token("token123")
+///     .build();
+///
+/// let (client, handle) = Client::connect(opts);
+/// ```
 pub struct Client {
     opts: Arc<ClientOpts>,
     seq: Arc<AtomicU64>,
@@ -141,6 +176,26 @@ pub struct Client {
     actor_tx: flume::Sender<actor::Msg>,
 }
 
+/// Options for configuring an `orb-relay` Client.
+///
+/// # Example
+/// ```ignore
+/// let opts = ClientOpts::entity()
+///     // Required fields:
+///     .entity_type(EntityType::Orb)
+///     .id("device_1")
+///     .namespace("default")
+///     .endpoint("http://localhost:8080")
+///     .auth_token("token123")
+///     // Optional fields (defaults provided):
+///     .connection_timeout(Duration::from_secs(30))
+///     .max_connection_attempts(Amount::Infinite)
+///     .ack_timeout(Duration::from_secs(20))
+///     .reply_timeout(Duration::from_secs(20))
+///     .heartbeat(Duration::from_secs(30))
+///     .max_message_attempts(Amount::Infinite)
+///     .build();
+/// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(start_fn = entity)]
@@ -167,6 +222,24 @@ pub struct ClientOpts {
 }
 
 impl Client {
+    /// Establishes a connection to `orb-relay` and returns a client instance along with a join handle.
+    /// The connection will automatically reconnect if lost, until the maximum number of connection attempts
+    /// (configured via ClientOpts::max_connection_attempts) is reached.
+    ///
+    /// Messages sent while offline are buffered and eventually sent when connection is established.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let opts = ClientOpts::entity()
+    ///     .entity_type(EntityType::Orb)
+    ///     .id("device_1")
+    ///     .namespace("default")
+    ///     .endpoint("http://localhost:8080")
+    ///     .auth_token("token123")
+    ///     .build();
+    ///
+    /// let (client, handle) = Client::connect(opts);
+    /// ```
     pub fn connect(opts: ClientOpts) -> (Client, JoinHandle<Result<(), Err>>) {
         let (tonic_tx, tonic_rx) = flume::unbounded();
         let (client_tx, client_rx) = flume::unbounded();
@@ -190,6 +263,17 @@ impl Client {
         (client, join_handle)
     }
 
+    /// Stops the client from running. User can await the original join handle returned
+    /// when client was created to wait for the client to finish stopping.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let (client, handle) = Client::connect(opts);
+    ///
+    /// // Stop the client and wait for it to finish
+    /// client.stop().await?;
+    /// handle.await??;
+    /// ```
     pub async fn stop(&self) -> Result<(), Err> {
         self.actor_tx
             .send(actor::Msg::Stop)
@@ -198,6 +282,18 @@ impl Client {
         Ok(())
     }
 
+    /// Asynchronously receives a message, yielding to the tokio runtime.
+    /// Clone the client and pass it to a spawned task to avoid blocking.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let client_rx = client.clone();
+    /// tokio::spawn(async move {
+    ///     while let Ok(msg) = client_rx.recv().await {
+    ///         // Handle message
+    ///     }
+    /// });
+    /// ```
     pub async fn recv(&self) -> Result<RecvMessage<'_>, Err> {
         let msg = self.client_rx.recv_async().await?;
 
@@ -209,6 +305,29 @@ impl Client {
         })
     }
 
+    /// Sends a message without confirmation the other client received it, but optionally with confirmation
+    /// that the orb-relay server received it by using `QoS::AtLeastOnce`
+    ///
+    /// # Example
+    /// ```ignore
+    /// // Send a message with at-most-once delivery (no ack)
+    /// client.send(
+    ///     SendMessage::to(EntityType::Orb)
+    ///         .id("device_1")
+    ///         .namespace("default")
+    ///         .qos(QoS::AtMostOnce)
+    ///         .payload(b"hello")
+    /// ).await?;
+    ///
+    /// // Send with at-least-once delivery (waits for ack)
+    /// client.send(
+    ///     SendMessage::to(EntityType::Orb)
+    ///         .id("device_1")
+    ///         .namespace("default")
+    ///         .qos(QoS::AtLeastOnce)
+    ///         .payload(vec![1,2,3])
+    /// ).await?;
+    /// ```
     pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
@@ -237,6 +356,19 @@ impl Client {
         Ok(())
     }
 
+    /// Sends a message and waits for a reply from the destination client.
+    /// Unlike `send()` with `QoS::AtLeastOnce` which only confirms delivery to the orb-relay server,
+    /// this method waits for an actual response from the target client.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let response = client.ask(
+    ///     SendMessage::to(EntityType::Orb)
+    ///         .id("device_1")
+    ///         .namespace("default")
+    ///         .payload("what is your status?")
+    /// ).await?;
+    /// ```
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
@@ -261,49 +393,6 @@ impl Client {
             .wrap_err("Error when waiting for ack")?;
 
         Ok(reply.payload)
-    }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum Amount {
-    Val(u64),
-    Infinite,
-}
-
-impl PartialEq<u64> for Amount {
-    fn eq(&self, other: &u64) -> bool {
-        match self {
-            Amount::Val(v) => v == other,
-            Amount::Infinite => false,
-        }
-    }
-}
-
-impl PartialOrd<u64> for Amount {
-    fn partial_cmp(&self, other: &u64) -> Option<std::cmp::Ordering> {
-        match self {
-            Amount::Val(v) => v.partial_cmp(other),
-            Amount::Infinite => Some(std::cmp::Ordering::Greater),
-        }
-    }
-}
-
-impl Amount {
-    pub fn is_nonzero(&self) -> bool {
-        if let Amount::Val(0) = self {
-            return false;
-        };
-
-        true
-    }
-}
-
-impl Amount {
-    pub(crate) fn decrement(self) -> Self {
-        match self {
-            Amount::Val(v) if v > 0 => Amount::Val(v - 1),
-            _ => self,
-        }
     }
 }
 
