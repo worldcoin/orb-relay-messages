@@ -129,7 +129,7 @@ impl<'a> RecvMessage<'a> {
             }),
             dst: Some(Entity {
                 id: self.from.id.clone(),
-                entity_type: self.from.entity_type as i32,
+                entity_type: self.from.entity_type,
                 namespace: self.from.namespace.clone(),
             }),
             seq: self.seq,
@@ -228,6 +228,7 @@ pub struct Client {
 ///     .max_message_attempts(Amount::Infinite)
 ///     .build();
 /// ```
+#[allow(clippy::duplicated_attributes)] // clippy fail
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(on(Auth, into))]
