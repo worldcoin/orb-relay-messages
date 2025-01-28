@@ -11,7 +11,7 @@ use orb_relay_messages::{
         ConnectResponse, Entity, RelayPayload,
     },
 };
-use std::{time::Duration};
+use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::time;
 
