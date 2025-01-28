@@ -19,6 +19,20 @@ mod flume_receiver_stream;
 pub type ClientId = String;
 pub type Seq = u64;
 
+/// A message to be sent to a another client through `orb-relay`.
+/// QoS (Quality of Service) is optional and defaults to `QoS::AtMostOnce`.
+///
+/// # Example
+/// ```ignore
+/// // Create a message to send to a device
+/// let msg = SendMessage::to(EntityType::Device)
+///     .id("device_123")
+///     .namespace("default")
+///     .qos(QoS::AtLeastOnce) // Optional, defaults to AtMostOnce
+///     .payload(b"hello");
+///
+/// client.send(msg).await.unwrap();
+/// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(on(Vec<u8>, into))]
@@ -38,6 +52,16 @@ pub struct SendMessage {
     qos: QoS,
 }
 
+/// Authentication options for the client.
+///
+/// - `Token`: Authentication using a secret token string
+/// - `Zkp`: Zero Knowledge Proof authentication (TODO: not yet implemented)
+///
+/// # Example
+/// ```ignore
+/// // Authentication with a token:
+/// let auth = Auth::Token("your_secure_token".into());
+/// ```
 #[derive(From, Debug, Clone)]
 pub enum Auth {
     Token(SecretString),
@@ -84,7 +108,7 @@ impl<'a> RecvMessage<'a> {
     /// async fn handle_message(client: &Client) {
     ///     while let Ok(msg) = client.recv().await {
     ///         // Reply with "hello" using at-most-once delivery
-    ///         msg.reply("hello", QoS::AtMostOnce).await.unwrap();
+    ///         msg.reply(b"hello", QoS::AtMostOnce).await.unwrap();
     ///
     ///         // Reply with bytes using at-least-once delivery
     ///         msg.reply(vec![1, 2, 3], QoS::AtLeastOnce).await.unwrap();
@@ -172,7 +196,7 @@ pub enum Err {
 ///     .id("device_1")
 ///     .namespace("default")
 ///     .endpoint("http://localhost:8080")
-///     .auth(Auth::Token("token123".to_string()))
+///     .auth(Auth::Token("token123".into()))
 ///     .build();
 ///
 /// let (client, handle) = Client::connect(opts);
