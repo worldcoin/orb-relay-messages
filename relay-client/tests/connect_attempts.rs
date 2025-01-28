@@ -3,10 +3,10 @@
 */
 mod test_server;
 
+use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use orb_relay_client::{Amount, Client, ClientOpts};
 use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::time;
@@ -35,7 +35,7 @@ async fn connects() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .build();
@@ -69,7 +69,7 @@ async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(expected_attempts))
         .connection_timeout(Duration::from_millis(10))
         .build();

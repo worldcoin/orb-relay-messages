@@ -1,5 +1,5 @@
 use crate::{
-    flume_receiver_stream, relay_payload, Amount, ClientId, ClientOpts, Err, QoS,
+    flume_receiver_stream, relay_payload, Amount, Auth, ClientId, ClientOpts, Err, QoS,
     RecvdRelayPayload, SendMessage, Seq,
 };
 use color_eyre::eyre::{eyre, Context};
@@ -8,6 +8,7 @@ use orb_relay_messages::relay::{
     relay_service_client::RelayServiceClient, Ack, ConnectRequest, ConnectResponse,
     Entity, RelayConnectRequest, RelayConnectResponse, RelayPayload,
 };
+use secrecy::ExposeSecret;
 use std::collections::HashMap;
 use tokio::{task, time};
 use tokio_stream::StreamExt;
@@ -370,7 +371,7 @@ async fn connect(
 
     let ClientOpts {
         endpoint: domain,
-        auth_token,
+        auth,
         client_id,
         namespace,
         entity_type,
@@ -397,7 +398,10 @@ async fn connect(
                     entity_type: *entity_type as i32,
                     namespace: namespace.clone(),
                 }),
-                auth_method: Some(AuthMethod::Token(auth_token.clone())),
+                auth_method: Some(match auth {
+                    Auth::Token(t) => AuthMethod::Token(t.expose_secret().to_string()),
+                    Auth::Zkp => todo!(),
+                }),
             })),
         })
         .wrap_err("Failed to send RelayConnectRequest")?;

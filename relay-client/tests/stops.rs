@@ -1,6 +1,6 @@
 mod test_server;
 
-use orb_relay_client::{Amount, Client, ClientOpts, Err, SendMessage};
+use orb_relay_client::{Amount, Auth, Client, ClientOpts, Err, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
@@ -33,7 +33,7 @@ async fn it_stops_sever_when_stop_is_called() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr().to_string()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .build();

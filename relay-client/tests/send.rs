@@ -3,6 +3,7 @@
 */
 mod test_server;
 
+use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::{
     prost_types::Any,
     relay::{
@@ -10,7 +11,6 @@ use orb_relay_messages::{
         ConnectResponse, Entity, RelayPayload,
     },
 };
-use orb_relay_client::{Amount, Client, ClientOpts, QoS, SendMessage};
 use std::{time::Duration, u64};
 use test_server::{IntoRes, TestServer};
 use tokio::time;
@@ -37,7 +37,7 @@ async fn sends_at_most_once_and_increases_seq() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .heartbeat(Duration::from_secs(u64::MAX))
@@ -132,7 +132,7 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .heartbeat(Duration::from_secs(u64::MAX))

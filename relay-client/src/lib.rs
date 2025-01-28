@@ -3,6 +3,7 @@ use color_eyre::eyre::{self, Context};
 use derive_more::From;
 use orb_relay_messages::prost_types::Any;
 use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
+use secrecy::SecretString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -21,6 +22,7 @@ pub type Seq = u64;
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(on(Vec<u8>, into))]
+#[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
 #[builder(finish_fn = payload)]
 pub struct SendMessage {
@@ -34,6 +36,12 @@ pub struct SendMessage {
     target_namespace: String,
     #[builder(default = QoS::AtMostOnce)]
     qos: QoS,
+}
+
+#[derive(From, Debug, Clone)]
+pub enum Auth {
+    Token(SecretString),
+    Zkp,
 }
 
 /// QoS delivery guarantees:
@@ -164,7 +172,7 @@ pub enum Err {
 ///     .id("device_1")
 ///     .namespace("default")
 ///     .endpoint("http://localhost:8080")
-///     .auth_token("token123")
+///     .auth(Auth::Token("token123".to_string()))
 ///     .build();
 ///
 /// let (client, handle) = Client::connect(opts);
@@ -186,7 +194,7 @@ pub struct Client {
 ///     .id("device_1")
 ///     .namespace("default")
 ///     .endpoint("http://localhost:8080")
-///     .auth_token("token123")
+///     .auth(Auth::Token("token123".to_string()))
 ///     // Optional fields (defaults provided):
 ///     .connection_timeout(Duration::from_secs(30))
 ///     .max_connection_attempts(Amount::Infinite)
@@ -198,6 +206,7 @@ pub struct Client {
 /// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
+#[builder(on(Auth, into))]
 #[builder(start_fn = entity)]
 pub struct ClientOpts {
     #[builder(start_fn)]
@@ -206,7 +215,7 @@ pub struct ClientOpts {
     client_id: String,
     namespace: String,
     endpoint: String,
-    auth_token: String, // TODO: secrecy
+    auth: Auth,
     #[builder(default = Duration::from_secs(20))]
     connection_timeout: Duration,
     #[builder(default = Amount::Infinite)]
@@ -235,7 +244,7 @@ impl Client {
     ///     .id("device_1")
     ///     .namespace("default")
     ///     .endpoint("http://localhost:8080")
-    ///     .auth_token("token123")
+    ///     .auth(Auth::Token("token123".to_string()))
     ///     .build();
     ///
     /// let (client, handle) = Client::connect(opts);

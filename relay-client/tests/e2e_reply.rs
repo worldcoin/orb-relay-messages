@@ -1,6 +1,6 @@
 mod test_server;
 
-use orb_relay_client::{Amount, Client, ClientOpts, QoS, SendMessage};
+use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
@@ -34,7 +34,7 @@ async fn sends_and_replies_to_message() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .heartbeat(Duration::from_secs(u64::MAX))
@@ -45,7 +45,7 @@ async fn sends_and_replies_to_message() {
         .id("boo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .heartbeat(Duration::from_secs(u64::MAX))

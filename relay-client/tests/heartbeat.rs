@@ -1,11 +1,10 @@
 mod test_server;
 
-use std::time::Duration;
-
+use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use orb_relay_client::{Amount, Client, ClientOpts};
+use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::time;
 
@@ -33,7 +32,7 @@ async fn it_sends_heartbeat_periodically() {
         .id("foo")
         .namespace("bar")
         .endpoint(format!("http://{}", sv.addr()))
-        .auth_token(String::default())
+        .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_millis(10))
         .heartbeat(Duration::from_millis(50))
