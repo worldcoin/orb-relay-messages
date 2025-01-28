@@ -4,7 +4,7 @@ use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use std::{time::Duration, u64};
+use std::time::Duration;
 use test_server::{IntoRes, TestServer};
 use tokio::task;
 

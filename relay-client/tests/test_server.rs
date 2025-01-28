@@ -44,7 +44,7 @@ impl ConnectedClients {
     #[allow(dead_code)]
     pub fn stop(&self, entity: &Entity) {
         let clients = self.clients.clone();
-        let entity_key = entity_key(&entity);
+        let entity_key = entity_key(entity);
 
         task::spawn(async move {
             let clients = clients.lock().await;
@@ -61,6 +61,7 @@ where
 {
     state: Arc<Mutex<S>>,
     clients: ConnectedClients,
+    #[allow(clippy::type_complexity)]
     handler: Arc<
         dyn Fn(
                 &mut S,
