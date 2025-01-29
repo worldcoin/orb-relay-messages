@@ -243,6 +243,8 @@ pub struct ClientOpts {
     auth: Auth,
     #[builder(default = Duration::from_secs(20))]
     connection_timeout: Duration,
+    #[builder(default = Duration::from_secs(20))]
+    connection_backoff: Duration,
     #[builder(default = Amount::Infinite)]
     max_connection_attempts: Amount,
     #[builder(default = Duration::from_secs(20))]

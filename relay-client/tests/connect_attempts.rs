@@ -7,7 +7,7 @@ use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use test_server::{IntoRes, TestServer};
 use tokio::time;
 
@@ -53,7 +53,7 @@ async fn connects() {
 #[tokio::test]
 async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
     // Arrange
-    let expected_attempts = 2;
+    let expected_attempts = 3;
     let sv = TestServer::new(0, |attempts, _conn_req, _| {
         *attempts += 1;
         ConnectResponse {
@@ -72,6 +72,7 @@ async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(expected_attempts))
         .connection_timeout(Duration::from_millis(10))
+        .connection_backoff(Duration::ZERO)
         .build();
 
     // Act
@@ -82,4 +83,36 @@ async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
     assert!(res.is_err());
     let actual_attempts = sv.state().await;
     assert_eq!(*actual_attempts, expected_attempts);
+}
+
+#[tokio::test]
+async fn sleeps_for_backoff_period_between_connection_attempts() {
+    // Arrange
+    let sv = TestServer::new((0, Instant::now()), |attempts, _conn_req, _| {
+        attempts.0 += 1;
+        ConnectResponse {
+            client_id: "doesntmatter".to_string(),
+            success: false,
+            error: "nothing".to_string(),
+        }
+        .into_res()
+    })
+    .await;
+
+    let opts = ClientOpts::entity(EntityType::App)
+        .id("foo")
+        .namespace("bar")
+        .endpoint(format!("http://{}", sv.addr()))
+        .auth(Auth::Token(Default::default()))
+        .max_connection_attempts(Amount::Infinite)
+        .connection_backoff(Duration::from_millis(50))
+        .build();
+
+    // Act
+    let (_client, _handle) = Client::connect(opts);
+
+    // Assert
+    time::sleep(Duration::from_millis(150)).await;
+    let actual_attempts = sv.state().await;
+    assert_eq!(actual_attempts.0, 3);
 }

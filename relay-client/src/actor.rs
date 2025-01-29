@@ -12,6 +12,7 @@ use secrecy::ExposeSecret;
 use std::collections::HashMap;
 use tokio::{task, time};
 use tokio_stream::StreamExt;
+use tokio_util::sync::CancellationToken;
 use tonic::{
     transport::{ClientTlsConfig, Endpoint},
     Streaming,
@@ -78,31 +79,31 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
         loop {
             conn_attempts += 1;
 
-            match main_loop(
+            let cancellation_token = CancellationToken::new();
+            let result = main_loop(
                 &mut state,
                 &props,
                 relay_actor_tx_clone.clone(),
                 relay_actor_rx.clone(),
+                cancellation_token.clone(),
             )
-            .await
-            {
-                Err(Err::StopRequest) => {
+            .await;
+
+            if let Err(e) = result {
+                cancellation_token.cancel();
+                if let Err::StopRequest = e {
                     return Err(Err::StopRequest);
-                }
+                } else if props.opts.max_connection_attempts <= conn_attempts {
+                    return Err(e);
+                } else {
+                    error!(
+                        "RelayClient errored out {e:?}. Retrying in {}s",
+                        props.opts.connection_timeout.as_secs()
+                    );
 
-                Err(e) => {
-                    if props.opts.max_connection_attempts <= conn_attempts {
-                        return Err(e);
-                    } else {
-                        error!(
-                            "RelayClient errored out {e:?}. Retrying in {}s",
-                            props.opts.connection_timeout.as_secs()
-                        );
-                    }
+                    time::sleep(props.opts.connection_backoff).await;
                 }
-
-                Ok(()) => (),
-            }
+            };
         }
     });
 
@@ -114,10 +115,11 @@ async fn main_loop(
     props: &Props,
     relay_actor_tx: flume::Sender<Msg>,
     relay_actor_rx: flume::Receiver<Msg>,
+    cancellation_token: CancellationToken,
 ) -> Result<(), Err> {
     let mut response_stream = time::timeout(
         props.opts.connection_timeout,
-        connect(props, &relay_actor_tx),
+        connect(props, &relay_actor_tx, cancellation_token),
     )
     .await
     .wrap_err("Timed out trying to establish a connection")??;
@@ -361,6 +363,7 @@ fn handle_ack(state: &mut State, seq: Seq) {
 async fn connect(
     props: &Props,
     relay_actor_tx: &flume::Sender<Msg>,
+    cancellation_token: CancellationToken,
 ) -> Result<Streaming<RelayConnectResponse>, Err> {
     let Props {
         opts,
@@ -407,7 +410,11 @@ async fn connect(
         .wrap_err("Failed to send RelayConnectRequest")?;
 
     let mut response_stream: Streaming<RelayConnectResponse> = relay_client
-        .relay_connect(flume_receiver_stream::new(tonic_rx.clone(), 4))
+        .relay_connect(flume_receiver_stream::new(
+            tonic_rx.clone(),
+            4,
+            cancellation_token,
+        ))
         .await?
         .into_inner();
 
