@@ -9,7 +9,8 @@ use tokio_util::sync::CancellationToken;
 /// ## example
 /// ```ignore
 /// let (tx, rx) = fume::unbounded();
-/// let recv_stream = flume_receiver_stream::new(rx.clone(), 4);
+/// let cancellation_token = CancellationToken::new();
+/// let recv_stream = flume_receiver_stream::new(rx.clone(), 4, cancellation_token.clone());
 /// ```
 pub fn new<T: Send + 'static>(
     flume_rx: flume::Receiver<T>,
