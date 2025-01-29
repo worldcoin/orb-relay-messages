@@ -84,23 +84,14 @@ pub(crate) struct RecvdRelayPayload {
 }
 
 #[derive(Debug)]
-pub struct RecvMessage<'a> {
+pub struct RecvMessage {
     pub from: Entity,
     pub payload: Vec<u8>,
-    client: &'a Client,
+    client: Client,
     seq: Seq,
 }
 
-impl<'a> RecvMessage<'a> {
-    pub fn new(from: Entity, payload: Vec<u8>, client: &'a Client, seq: Seq) -> Self {
-        Self {
-            from,
-            payload,
-            client,
-            seq,
-        }
-    }
-
+impl RecvMessage {
     /// Reply to the sender of this message with a payload and specified QoS level.
     ///
     /// # Example
@@ -330,13 +321,13 @@ impl Client {
     ///     }
     /// });
     /// ```
-    pub async fn recv(&self) -> Result<RecvMessage<'_>, Err> {
+    pub async fn recv(&self) -> Result<RecvMessage, Err> {
         let msg = self.client_rx.recv_async().await?;
 
         Ok(RecvMessage {
             from: msg.from,
             payload: msg.payload,
-            client: self,
+            client: self.clone(),
             seq: msg.seq,
         })
     }
