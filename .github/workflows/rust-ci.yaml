@@ -33,6 +33,21 @@ jobs:
       - name: Clippy lints
         run: cargo clippy --all --all-features --all-targets --no-deps -- -D warnings
 
+  test:
+    name: Test
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # pin@v4.1.7
+      - name: Cache cargo dependencies
+        uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84 # pin@v2.7.3
+      - name: Install Protoc
+        uses: arduino/setup-protoc@c65c819552d16ad3c9b72d9dfd5ba5237b9c906b # pin@v3.0.0
+        with:
+          version: "24.1"
+
+      - name: Cargo test
+        run: cargo test --all --all-features
+
   doc:
     name: Docs
     runs-on: ubuntu-22.04
