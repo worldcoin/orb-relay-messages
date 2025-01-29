@@ -84,7 +84,7 @@ pub(crate) struct RecvdRelayPayload {
 }
 
 #[derive(Debug)]
-pub struct RecvMessage<'a> {
+pub struct RecvMessage {
     pub from: Entity,
     pub payload: Vec<u8>,
     client: Client,
