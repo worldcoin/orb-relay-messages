@@ -36,7 +36,7 @@ pub fn new<T: Send + 'static>(
             }
         }
 
-        Ok::<_,flume::RecvError>(())
+        Ok::<_, flume::RecvError>(())
     });
 
     ReceiverStream::new(rx)
