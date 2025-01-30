@@ -1,0 +1,27 @@
+[package]
+name = "orb-relay-client"
+version = "0.0.1"
+description = """
+relay-client for communicate with other relay-cients through orb-relay-service
+"""
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+orb-relay-messages = { workspace = true, features = ["client"] }
+tokio = { workspace = true, fetures = ["full"] }
+tokio-util.workspace = true
+tonic = { workspace = true, features = ["tls-roots"] }
+derive_more.workspace = true
+color-eyre.workspace = true
+tokio-stream.workspace = true
+tracing.workspace = true
+flume.workspace = true
+bon.workspace = true
+secrecy.workspace = true
+
+[dev-dependencies]
+async-stream.workspace = true
+orb-relay-messages = { workspace = true, features = ["client", "server"] }
