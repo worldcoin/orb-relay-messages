@@ -4,6 +4,7 @@ use orb_relay_messages::relay::{
 };
 use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
+use orb_relay_test_utils::{IntoRes, TestServer};
 use tokio::time;
 
 #[tokio::test]
