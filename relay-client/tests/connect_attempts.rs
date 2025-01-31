@@ -1,14 +1,12 @@
 /*
 * tests RelayClient attempts to connect over and over again until it reaches maximum determined number of attempts
 */
-mod test_server;
-
 use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
+use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::{Duration, Instant};
-use test_server::{IntoRes, TestServer};
 use tokio::time;
 
 #[tokio::test]

@@ -1,8 +1,6 @@
 /*
 * Tests whether a client A can ask a message from client B
 */
-mod test_server;
-
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::{
     prost_types::Any,
@@ -11,8 +9,8 @@ use orb_relay_messages::{
         ConnectResponse, Entity, RelayPayload,
     },
 };
+use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
-use test_server::{IntoRes, TestServer};
 use tokio::time;
 
 #[tokio::test]

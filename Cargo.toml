@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["rust", "relay-client"]
+members = ["rust", "relay-client", "test-utils"]
 
 [workspace.package]
 edition = "2021"
@@ -11,6 +11,8 @@ rust-version = "1.82.0"                                        # See rust-versio
 [workspace.dependencies]
 # first party
 orb-relay-messages = { path = "rust" }
+orb-relay-client = { path = "relay-client" }
+orb-relay-test-utils = { path = "test-utils" }
 
 # third party
 async-stream = "0.3.6"
@@ -30,3 +32,4 @@ derive_more = { version = "0.99" }
 tracing = "0.1"
 bon = "3.3.2"
 secrecy = "0.10.3"
+pollster = "0.4.0"

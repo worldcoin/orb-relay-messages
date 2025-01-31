@@ -1,11 +1,9 @@
-mod test_server;
-
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
+use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
-use test_server::{IntoRes, TestServer};
 use tokio::task;
 
 struct NoState;
