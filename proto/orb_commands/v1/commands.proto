@@ -6,7 +6,7 @@ message OrbCommandIssue {
   uint64 command_id = 1;
   oneof command {
     OrbDetailsRequest orb_details = 2;
-    RebootRequest reboot = 3;
+    OrbRebootRequest reboot = 3;
   }
 }
 
@@ -39,6 +39,6 @@ message OrbDetailsResponse {
   uint64 uptime_seconds = 9;
 }
 
-message RebootRequest {
+message OrbRebootRequest {
   uint64 delay_seconds = 1;
 }
