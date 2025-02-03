@@ -12,8 +12,7 @@ rust-version.workspace = true
 [dependencies]
 orb-relay-messages = { workspace = true, features = ["client"] }
 orb-relay-test-utils = { workspace = true }
-
-tokio = { workspace = true, fetures = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 tokio-util.workspace = true
 tonic = { workspace = true, features = ["tls-roots"] }
 derive_more.workspace = true
