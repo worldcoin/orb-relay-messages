@@ -29,7 +29,6 @@ impl ConnectedClients {
         clients.insert(key, tx.clone());
     }
 
-    #[allow(dead_code)] // wtf, this is actually used lol...
     pub fn send(&self, payload: RelayPayload) {
         let clients = self.clients.clone();
         task::spawn(async move {
@@ -41,7 +40,6 @@ impl ConnectedClients {
         });
     }
 
-    #[allow(dead_code)]
     pub fn stop(&self, entity: &Entity) {
         let clients = self.clients.clone();
         let entity_key = entity_key(entity);
@@ -151,7 +149,6 @@ where
 /// separate tokio task and will be shut down when this struct is dropped.
 pub struct TestServer<S> {
     addr: SocketAddr,
-    #[allow(dead_code)] // not dead code but clippy complains eh
     state: Arc<Mutex<S>>,
     shutdown: flume::Sender<()>,
 }
@@ -170,6 +167,8 @@ where
     ///
     /// The handler receives mutable access to the server state and each incoming request message.
     /// It can modify the state and returns an optional response message.
+    /// One can also send messages to other clients connected to the server through `ConnectedClients`
+    /// which is also provided through the closure.
     ///
     /// The server's state can be accessed at any time by calling `self.state()`, which returns
     /// a MutexGuard containing the state.
@@ -177,7 +176,7 @@ where
     /// # Example
     /// ```ignore
     /// let initial_state = 0;
-    /// let sv = TestServer::new(initial_state, |state, conn_req| {
+    /// let sv = TestServer::new(initial_state, |state, conn_req, clients| {
     ///     *state += 1;
     ///     match conn_req {
     ///         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {

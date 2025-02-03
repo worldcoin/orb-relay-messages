@@ -744,6 +744,7 @@ dependencies = [
  "derive_more",
  "flume",
  "orb-relay-messages",
+ "orb-relay-test-utils",
  "secrecy",
  "tokio",
  "tokio-stream",
@@ -761,6 +762,19 @@ dependencies = [
  "prost-types",
  "tonic",
  "tonic-build",
+]
+
+[[package]]
+name = "orb-relay-test-utils"
+version = "0.0.1"
+dependencies = [
+ "async-stream",
+ "flume",
+ "orb-relay-messages",
+ "pollster",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]
@@ -839,6 +853,12 @@ name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
+name = "pollster"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f3a9f18d041e6d0e102a0a46750538147e5e8992d3b4873aaafee2520b00ce3"
 
 [[package]]
 name = "ppv-lite86"
