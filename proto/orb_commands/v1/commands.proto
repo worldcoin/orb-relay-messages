@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package orb_commands.v1;
 
-message OrbCommandIssue {
+message OrbCommandRequest {
   uint64 command_id = 1;
   oneof command {
     OrbDetailsRequest orb_details = 2;
