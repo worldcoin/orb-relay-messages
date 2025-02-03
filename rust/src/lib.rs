@@ -52,3 +52,9 @@ pub mod self_serve {
 pub mod config {
     tonic::include_proto!("config");
 }
+
+pub mod orb_commands {
+    pub mod v1 {
+        tonic::include_proto!("orb_commands.v1");
+    }
+}
