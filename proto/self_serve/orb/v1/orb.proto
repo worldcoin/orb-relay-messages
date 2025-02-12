@@ -53,4 +53,5 @@ message PreflightCheck {
   bool is_user_seen = 1;
   bool is_not_too_far = 2;
   bool is_not_too_close = 3;
+  bool is_face_not_occluded = 4;
 }
