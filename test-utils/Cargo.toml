@@ -13,7 +13,7 @@ rust-version.workspace = true
 orb-relay-messages = { workspace = true, features = ["client", "server"] }
 
 async-stream.workspace = true
-tokio = { workspace = true, fetures = ["full"] }
+tokio = { workspace = true, features = ["full"] }
 tonic = { workspace = true, features = ["tls-roots"] }
 tokio-stream.workspace = true
 flume.workspace = true
