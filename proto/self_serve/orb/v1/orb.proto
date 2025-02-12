@@ -54,4 +54,7 @@ message PreflightCheck {
   bool is_not_too_far = 2;
   bool is_not_too_close = 3;
   bool is_face_not_occluded = 4;
+  bool is_face_not_too_low = 5;
+  bool is_face_not_too_high = 6;
+  bool is_position_stable = 7;
 }

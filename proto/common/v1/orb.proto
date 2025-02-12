@@ -28,4 +28,6 @@ message AnnounceOrbId {
   string orb_id = 1;
   ModeType mode_type = 2;
   HardwareType hardware_type = 3;
+  bool has_preflight_checks = 4;
+  bool has_preflight_checks_with_occlusion = 5;
 }
