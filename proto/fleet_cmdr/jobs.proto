@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package fleet_cmdr.v1;
+
+message JobExecutionRequest {
+  string job_id = 1;
+  string command = 2;
+  string args = 3;
+}
+
+message JobExecutionUpdate {
+  string job_id = 1;
+  string job_execution_id = 2;
+  JobExecutionStatus status = 3;
+  string std_out = 4;
+  string std_err = 5;
+}
+
+enum JobExecutionStatus {
+  JOB_EXECUTION_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  RUNNING = 2;
+  COMPLETED = 3;
+  FAILED = 4;
+}
