@@ -4,8 +4,9 @@ package fleet_cmdr.v1;
 
 message JobExecutionRequest {
   string job_id = 1;
-  string command = 2;
-  string args = 3;
+  string job_execution_id = 2;
+  string command = 3;
+  string args = 4;
 }
 
 message JobExecutionUpdate {

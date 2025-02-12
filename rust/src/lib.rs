@@ -58,3 +58,9 @@ pub mod orb_commands {
         tonic::include_proto!("orb_commands.v1");
     }
 }
+
+pub mod fleet_cmdr {
+    pub mod v1 {
+        tonic::include_proto!("fleet_cmdr.v1");
+    }
+}
