@@ -2,7 +2,11 @@ syntax = "proto3";
 
 package fleet_cmdr.v1;
 
-message JobExecutionRequest {
+message JobNotify {}
+
+message JobRequestNext {}
+
+message JobExecution {
   string job_id = 1;
   string job_execution_id = 2;
   string command = 3;
