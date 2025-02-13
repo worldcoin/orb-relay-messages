@@ -16,7 +16,6 @@ fn main() {
                 "./proto/relay.proto",
                 "./proto/common/v1/orb.proto",
                 "./proto/common/v1/misc.proto",
-                "./proto/orb_commands/v1/commands.proto",
                 "./proto/self_serve/app/v1/app.proto",
                 "./proto/self_serve/orb/v1/orb.proto",
                 "./proto/config/backend.proto",
