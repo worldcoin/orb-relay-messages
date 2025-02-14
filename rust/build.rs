@@ -22,7 +22,7 @@ fn main() {
                 "./proto/config/orb.proto",
                 "./proto/fleet_cmdr/jobs.proto",
             ],
-            &["./proto"],
+            &["./proto", "/usr/local/include"],
         )
         .unwrap();
 }
