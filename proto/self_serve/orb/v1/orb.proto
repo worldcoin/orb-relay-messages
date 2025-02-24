@@ -61,11 +61,19 @@ message SignupEnded {
 message AgeVerificationRequiredFromOperator {}
 
 message PreflightCheck {
-  bool is_user_seen = 1;
-  bool is_not_too_far = 2;
-  bool is_not_too_close = 3;
-  bool is_face_not_occluded = 4;
-  bool is_face_not_too_low = 5;
-  bool is_face_not_too_high = 6;
-  bool is_position_stable = 7;
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_OK = 1;
+    STATUS_FACE_NOT_SEEN = 2;
+    STATUS_FACE_TOO_FAR = 3;
+    STATUS_FACE_TOO_CLOSE = 4;
+    STATUS_FACE_TOO_LOW = 5;
+    STATUS_FACE_TOO_HIGH = 6;
+    STATUS_CHIN_TOO_LOW = 7;
+    STATUS_CHIN_TOO_HIGH = 8;
+    STATUS_POSITION_NOT_STABLE = 9;
+    STATUS_FACE_OCCLUDED = 10;
+  }
+
+  Status status = 1;
 }
