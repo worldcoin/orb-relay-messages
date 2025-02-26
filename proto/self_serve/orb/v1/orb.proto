@@ -74,6 +74,7 @@ message PreflightCheck {
     STATUS_HEAD_POSE_NOT_STRAIGHT = 9;
     STATUS_POSITION_NOT_STABLE = 10;
     STATUS_FACE_OCCLUDED = 11;
+    STATUS_WARMING_UP = 12;
   }
 
   Status status = 1;
