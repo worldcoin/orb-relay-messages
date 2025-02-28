@@ -23,7 +23,7 @@ message JobExecutionUpdate {
 enum JobExecutionStatus {
   JOB_EXECUTION_STATUS_UNSPECIFIED = 0;
   PENDING = 1;
-  RUNNING = 2;
-  COMPLETED = 3;
+  IN_PROGRESS = 2;
+  SUCCEEDED = 3;
   FAILED = 4;
 }
