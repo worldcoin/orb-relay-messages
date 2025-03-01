@@ -403,6 +403,7 @@ async fn connect(
                 }),
                 auth_method: Some(match auth {
                     Auth::Token(t) => AuthMethod::Token(t.expose_secret().to_string()),
+                    Auth::TokenReceiver(t) => AuthMethod::Token(t.borrow().to_string()),
                     Auth::Zkp => todo!(),
                 }),
             })),
