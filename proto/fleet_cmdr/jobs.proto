@@ -18,6 +18,7 @@ message JobExecutionUpdate {
   JobExecutionStatus status = 3;
   string std_out = 4;
   string std_err = 5;
+  optional string orb_id = 6;
 }
 
 enum JobExecutionStatus {
