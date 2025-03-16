@@ -1,4 +1,6 @@
-use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
+use orb_relay_client::{
+    Amount, Auth, Client, ClientOpts, QoS, RelayClient, SendMessage,
+};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };

@@ -1,9 +1,11 @@
+use async_trait::async_trait;
 use bon::Builder;
 use color_eyre::eyre::{self, Context};
 use derive_more::From;
 use orb_relay_messages::prost_types::Any;
 use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
 use secrecy::SecretString;
+use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -51,6 +53,8 @@ pub struct SendMessage {
     target_namespace: String,
     #[builder(default = QoS::AtMostOnce)]
     qos: QoS,
+    #[builder(skip)]
+    pub(crate) seq: Option<u64>,
 }
 
 /// Authentication options for the client.
@@ -85,15 +89,38 @@ pub(crate) struct RecvdRelayPayload {
     pub seq: Seq,
 }
 
-#[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
     pub payload: Vec<u8>,
-    client: Client,
+    client: Arc<dyn RelayClient>,
     seq: Seq,
 }
 
+impl fmt::Debug for RecvMessage {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecvMessage")
+            .field("from", &self.from)
+            .field("payload", &self.payload)
+            .field("seq", &self.seq)
+            .finish()
+    }
+}
+
 impl RecvMessage {
+    pub fn new(
+        from: Entity,
+        payload: Vec<u8>,
+        client: Arc<dyn RelayClient>,
+        seq: Seq,
+    ) -> Self {
+        Self {
+            from,
+            payload,
+            client,
+            seq,
+        }
+    }
+
     /// Reply to the sender of this message with a payload and specified QoS level.
     ///
     /// # Example
@@ -113,54 +140,23 @@ impl RecvMessage {
         payload: impl Into<Vec<u8>>,
         qos: QoS,
     ) -> Result<(), Err> {
-        let payload = payload.into();
-        let relay_payload = RelayPayload {
-            src: Some(Entity {
-                id: self.client.opts.client_id.clone(),
-                entity_type: self.client.opts.entity_type as i32,
-                namespace: self.client.opts.namespace.clone(),
-            }),
-            dst: Some(Entity {
-                id: self.from.id.clone(),
-                entity_type: self.from.entity_type,
-                namespace: self.from.namespace.clone(),
-            }),
-            seq: self.seq,
-            payload: Some(Any {
-                type_url: "".to_string(),
-                value: payload.clone(),
-            }),
-        };
+        let entity_type =
+            EntityType::try_from(self.from.entity_type).wrap_err_with(|| {
+                format!(
+                    "message has invalid entity type {}",
+                    self.from.entity_type() as i32
+                )
+            })?;
 
-        self.client
-            .actor_tx
-            .send(actor::Msg::Send(relay_payload.into()))
-            .wrap_err("Failed to send message to tonic")?;
+        let mut msg = SendMessage::to(entity_type)
+            .id(self.from.id.clone())
+            .namespace(self.from.namespace.clone())
+            .qos(qos)
+            .payload(payload.into());
 
-        if let QoS::AtLeastOnce = qos {
-            let (ack_tx, ack_rx) = flume::unbounded();
+        msg.seq = Some(self.seq);
 
-            self.client
-                .actor_tx
-                .send(actor::Msg::WaitForAck {
-                    original_msg: SendMessage {
-                        target_type: EntityType::try_from(self.from.entity_type)
-                            .wrap_err("Failed to convert EntityType")?,
-                        data: payload,
-                        target_id: self.from.id.clone(),
-                        target_namespace: self.from.namespace.clone(),
-                        qos,
-                    },
-                    ack_tx,
-                    seq: self.seq,
-                })
-                .wrap_err("Error reaching actor loop")?;
-
-            ack_rx
-                .recv_async()
-                .await
-                .wrap_err("Error when waiting for ack")?;
-        };
+        self.client.send(msg).await?;
 
         Ok(())
     }
@@ -291,6 +287,21 @@ impl Client {
 
         (client, join_handle)
     }
+}
+
+#[async_trait]
+impl RelayClient for Client {
+    fn id(&self) -> String {
+        self.opts.client_id.clone()
+    }
+
+    fn namespace(&self) -> String {
+        self.opts.namespace.clone()
+    }
+
+    fn entity_type(&self) -> i32 {
+        self.opts.entity_type as i32
+    }
 
     /// Stops the client from running. User can await the original join handle returned
     /// when client was created to wait for the client to finish stopping.
@@ -303,7 +314,7 @@ impl Client {
     /// client.stop().await?;
     /// handle.await??;
     /// ```
-    pub async fn stop(&self) -> Result<(), Err> {
+    async fn stop(&self) -> Result<(), Err> {
         self.actor_tx
             .send(actor::Msg::Stop)
             .wrap_err("actor_tx failed to send Stop message")?;
@@ -323,13 +334,13 @@ impl Client {
     ///     }
     /// });
     /// ```
-    pub async fn recv(&self) -> Result<RecvMessage, Err> {
+    async fn recv(&self) -> Result<RecvMessage, Err> {
         let msg = self.client_rx.recv_async().await?;
 
         Ok(RecvMessage {
             from: msg.from,
             payload: msg.payload,
-            client: self.clone(),
+            client: Arc::new(self.clone()),
             seq: msg.seq,
         })
     }
@@ -357,8 +368,12 @@ impl Client {
     ///         .payload(vec![1,2,3])
     /// ).await?;
     /// ```
-    pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
-        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+    async fn send(&self, msg: SendMessage) -> Result<(), Err> {
+        let seq = match msg.seq {
+            Some(seq) => seq,
+            None => self.seq.fetch_add(1, Ordering::SeqCst),
+        };
+
         let payload = relay_payload(&self.opts, &msg, seq);
 
         self.actor_tx
@@ -401,8 +416,12 @@ impl Client {
     ///
     /// println!("Got response: {:?}", response);
     /// ```
-    pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
-        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
+    async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
+        let seq = match msg.seq {
+            Some(seq) => seq,
+            None => self.seq.fetch_add(1, Ordering::SeqCst),
+        };
+
         let payload = relay_payload(&self.opts, &msg, seq);
 
         self.actor_tx
@@ -450,4 +469,15 @@ pub(crate) fn relay_payload(
             value: msg.data.clone(),
         }),
     }
+}
+
+#[async_trait]
+pub trait RelayClient: Send + Sync {
+    fn id(&self) -> String;
+    fn namespace(&self) -> String;
+    fn entity_type(&self) -> i32;
+    async fn stop(&self) -> Result<(), Err>;
+    async fn recv(&self) -> Result<RecvMessage, Err>;
+    async fn send(&self, msg: SendMessage) -> Result<(), Err>;
+    async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err>;
 }
