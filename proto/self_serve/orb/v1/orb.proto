@@ -12,9 +12,13 @@ message W {
     SignupEnded signup_ended = 4;
     AgeVerificationRequiredFromOperator age_verification_required_from_operator = 5;
     PreflightCheck preflight_check = 6;
+    AppointmentFailure appointment_failure = 7;
+    AppointmentTimeout appointment_timeout = 8;
   }
 }
 
+message AppointmentFailure {}
+message AppointmentTimeout {}
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {
