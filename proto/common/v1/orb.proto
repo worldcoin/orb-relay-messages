@@ -8,6 +8,7 @@ message W {
   oneof w {
     NoState no_state = 1;
     AnnounceOrbId announce_orb_id = 2;
+    AnnounceAppId announce_app_id = 3;
   }
 }
 
