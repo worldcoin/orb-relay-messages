@@ -18,6 +18,16 @@ message JobExecutionUpdate {
   JobExecutionStatus status = 3;
   string std_out = 4;
   string std_err = 5;
+}
+
+// This is a separate message from JobExecutionUpdate to separate the domain of the job execution from the domain of the job execution subscriber.
+// The job service/worker will inject the orb_id into the JobExecutionSubscriberUpdate message.
+message JobExecutionSubscriberUpdate {
+  string job_id = 1;
+  string job_execution_id = 2;
+  JobExecutionStatus status = 3;
+  string std_out = 4;
+  string std_err = 5;
   optional string orb_id = 6;
 }
 
