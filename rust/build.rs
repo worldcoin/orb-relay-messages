@@ -20,7 +20,7 @@ fn main() {
                 "./proto/self_serve/orb/v1/orb.proto",
                 "./proto/config/backend.proto",
                 "./proto/config/orb.proto",
-                "./proto/jobs/jobs.proto",
+                "./proto/fleet_cmdr/fleet_cmdr.proto",
             ],
             &["./proto", "/usr/local/include"],
         )

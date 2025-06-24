@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package jobs.v1;
+package fleet_cmdr.v1;
 
 message JobNotify {}
 
