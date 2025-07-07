@@ -25,10 +25,11 @@ message JobExecutionUpdate {
 message JobExecutionSubscriberUpdate {
   string job_id = 1;
   string job_execution_id = 2;
-  JobExecutionStatus status = 3;
-  string std_out = 4;
-  string std_err = 5;
-  optional string orb_id = 6;
+  string job_execution_subscriber_id = 3;
+  JobExecutionStatus status = 4;
+  string std_out = 5;
+  string std_err = 6;
+  optional string orb_id = 7;
 }
 
 enum JobExecutionStatus {
