@@ -17,7 +17,9 @@ message W {
   }
 }
 
-message AppointmentFailure {}
+message AppointmentFailure {
+  string error_code = 1;
+}
 message AppointmentTimeout {}
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
