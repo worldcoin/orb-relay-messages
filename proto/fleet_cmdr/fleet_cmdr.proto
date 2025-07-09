@@ -4,7 +4,13 @@ package fleet_cmdr.v1;
 
 message JobNotify {}
 
-message JobRequestNext {}
+message JobRequestNext {
+  repeated string ignore_job_execution_ids = 1;
+}
+
+message JobCancel {
+  string job_execution_id = 1;
+}
 
 message JobExecution {
   string job_id = 1;
@@ -38,4 +44,5 @@ enum JobExecutionStatus {
   IN_PROGRESS = 2;
   SUCCEEDED = 3;
   FAILED = 4;
+  CANCELLED = 5;
 }
