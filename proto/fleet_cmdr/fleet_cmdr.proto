@@ -16,6 +16,7 @@ message JobExecution {
   string job_id = 1;
   string job_execution_id = 2;
   string job_document = 3;
+  bool should_cancel = 4;
 }
 
 message JobExecutionUpdate {
