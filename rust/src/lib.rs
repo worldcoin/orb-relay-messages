@@ -53,8 +53,8 @@ pub mod config {
     tonic::include_proto!("config");
 }
 
-pub mod jobs {
+pub mod fleet_cmdr {
     pub mod v1 {
-        tonic::include_proto!("jobs.v1");
+        tonic::include_proto!("fleet_cmdr.v1");
     }
 }

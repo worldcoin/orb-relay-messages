@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package fleet_cmdr.v1;
+
+message JobNotify {}
+
+message JobRequestNext {
+  repeated string ignore_job_execution_ids = 1;
+}
+
+message JobCancel {
+  string job_execution_id = 1;
+}
+
+message JobExecution {
+  string job_id = 1;
+  string job_execution_id = 2;
+  string job_document = 3;
+  bool should_cancel = 4;
+}
+
+message JobExecutionUpdate {
+  string job_id = 1;
+  string job_execution_id = 2;
+  JobExecutionStatus status = 3;
+  string std_out = 4;
+  string std_err = 5;
+}
+
+// This is a separate message from JobExecutionUpdate to separate the domain of the job execution from the domain of the job execution subscriber.
+// The job service/worker will inject the orb_id into the JobExecutionSubscriberUpdate message.
+message JobExecutionSubscriberUpdate {
+  string job_id = 1;
+  string job_execution_id = 2;
+  string job_execution_subscriber_id = 3;
+  JobExecutionStatus status = 4;
+  string std_out = 5;
+  string std_err = 6;
+  optional string orb_id = 7;
+}
+
+enum JobExecutionStatus {
+  JOB_EXECUTION_STATUS_UNSPECIFIED = 0;
+  PENDING = 1;
+  IN_PROGRESS = 2;
+  SUCCEEDED = 3;
+  FAILED = 4;
+  CANCELLED = 5;
+}
