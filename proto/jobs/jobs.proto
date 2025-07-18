@@ -46,4 +46,5 @@ enum JobExecutionStatus {
   SUCCEEDED = 3;
   FAILED = 4;
   CANCELLED = 5;
+  FAILED_UNSUPPORTED = 6; // Indicates that the job execution failed because the job is not supported by the orb, likely due to an outdated jobs agent.
 }
