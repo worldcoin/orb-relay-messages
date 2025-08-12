@@ -14,6 +14,7 @@ message W {
     PreflightCheck preflight_check = 6;
     AppointmentFailure appointment_failure = 7;
     AppointmentTimeout appointment_timeout = 8;
+    InvalidSession invalid_session = 9;
   }
 }
 
@@ -21,6 +22,13 @@ message AppointmentFailure {
   string error_code = 1;
 }
 message AppointmentTimeout {}
+message InvalidSession {
+  enum InvalidSessionTypes {
+    SESSION_EXPIRED = 0;
+    SESSION_NOT_FOUND = 1;
+    SESSION_ERROR = 2;
+  }
+}
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {
