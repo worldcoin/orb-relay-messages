@@ -47,7 +47,20 @@ message AnnounceOrbId {
   bool heartbeat = 7;
   uint64 protocol_version = 8;
 }
+
+// Appointment metadata for verification purposes
+message AppointmentMetadata {
+  string proof = 1;
+  string merkle_root = 2;
+  string nullifier_hash = 3;
+  int32 signal = 4;
+}
+
 message AnnounceAppId {
   uint64 protocol_version = 1;
   bool heartbeat = 2;
+  string self_custody_public_key = 3;
+  string identity_commitment = 4;
+  string bypass_age_verification_token = 5;
+  AppointmentMetadata appointment_metadata = 7;
 }

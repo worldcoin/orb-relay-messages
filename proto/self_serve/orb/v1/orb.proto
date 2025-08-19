@@ -18,11 +18,13 @@ message W {
   }
 }
 
+// Failures from the orb validating the user data
 message AppointmentFailure {
   string error_code = 1;
 }
 message AppointmentTimeout {}
 message InvalidUserData {}
+
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {
