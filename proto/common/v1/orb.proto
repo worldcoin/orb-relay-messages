@@ -62,5 +62,7 @@ message AnnounceAppId {
   string self_custody_public_key = 3;
   string identity_commitment = 4;
   string bypass_age_verification_token = 5;
-  AppointmentMetadata appointment_metadata = 7;
+  AppointmentMetadata appointment_metadata = 6;
+  string os = 7;
+  string os_version = 8;
 }
