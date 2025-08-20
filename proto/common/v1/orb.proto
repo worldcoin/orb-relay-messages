@@ -56,13 +56,17 @@ message AppointmentMetadata {
   int32 signal = 4;
 }
 
+message AppAuthenticatedData {
+  string self_custody_public_key = 1;
+  string identity_commitment = 2;
+}
+
 message AnnounceAppId {
   uint64 protocol_version = 1;
   bool heartbeat = 2;
-  string self_custody_public_key = 3;
-  string identity_commitment = 4;
+  AppAuthenticatedData app_data = 3;
+  AppointmentMetadata appointment_metadata = 4;
   string bypass_age_verification_token = 5;
-  AppointmentMetadata appointment_metadata = 6;
-  string os = 7;
-  string os_version = 8;
+  string os = 6;
+  string os_version = 7;
 }
