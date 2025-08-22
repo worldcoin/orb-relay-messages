@@ -14,7 +14,7 @@ message W {
     PreflightCheck preflight_check = 6;
     AppointmentFailure appointment_failure = 7;
     AppointmentTimeout appointment_timeout = 8;
-    InvalidUserData invalid_user_data = 9;
+    UserDataFailure user_data_failure = 9;
   }
 }
 
@@ -23,8 +23,16 @@ message AppointmentFailure {
   string error_code = 1;
 }
 message AppointmentTimeout {}
-message InvalidUserData {}
-
+message UserDataFailure {
+  enum ErrorType {
+    HASH_INVALID = 0;
+    // from signup service - user validation request errors
+    SERVER_ERROR = 1;
+    INVALID_REQUEST_DATA = 2;
+    BYPASS_AGE_TOKEN_INVALID = 3;
+    UNKNOWN = 4;
+  }
+}
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
 message CaptureEnded {

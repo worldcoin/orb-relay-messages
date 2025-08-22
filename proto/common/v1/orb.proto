@@ -56,9 +56,13 @@ message AppointmentMetadata {
   int32 signal = 4;
 }
 
+// static data that is hashed with the user QR code
 message AppAuthenticatedData {
   string self_custody_public_key = 1;
   string identity_commitment = 2;
+  string os = 3;
+  string os_version = 4;
+  uint32 pcp_version = 5;
 }
 
 message AnnounceAppId {
@@ -67,6 +71,4 @@ message AnnounceAppId {
   AppAuthenticatedData app_data = 3;
   AppointmentMetadata appointment_metadata = 4;
   string bypass_age_verification_token = 5;
-  string os = 6;
-  string os_version = 7;
 }
