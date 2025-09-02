@@ -53,7 +53,7 @@ message AppointmentMetadata {
   string proof = 1;
   string merkle_root = 2;
   string nullifier_hash = 3;
-  int32 signal = 4;
+  uint64 signal = 4;
 }
 
 // static data that is hashed with the user QR code
