@@ -33,7 +33,7 @@ message UserDataFailure {
     UNKNOWN = 4;
   }
 
-  ErrorType type = 1;
+  ErrorType error_type = 1;
 }
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
