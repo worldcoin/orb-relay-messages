@@ -32,6 +32,8 @@ message UserDataFailure {
     BYPASS_AGE_TOKEN_INVALID = 3;
     UNKNOWN = 4;
   }
+
+  ErrorType type = 1;
 }
 message CaptureStarted {}
 message CaptureTriggerTimeout {}
