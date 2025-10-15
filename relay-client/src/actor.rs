@@ -157,6 +157,7 @@ async fn main_loop(
 }
 
 /// This loop only runs if we have a connection.
+#[allow(clippy::result_large_err)]
 fn handle_msg(
     state: &mut State,
     props: &Props,

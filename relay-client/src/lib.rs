@@ -197,7 +197,9 @@ pub enum Err {
 pub struct Client {
     opts: Arc<ClientOpts>,
     seq: Arc<AtomicU64>,
+    #[builder(setters(vis = "pub(crate)"))]
     client_rx: flume::Receiver<RecvdRelayPayload>,
+    #[builder(setters(vis = "pub(crate)"))]
     actor_tx: flume::Sender<actor::Msg>,
 }
 
