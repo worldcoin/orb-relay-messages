@@ -46,6 +46,7 @@ message AnnounceOrbId {
   Selector selector = 6;
   bool heartbeat = 7;
   uint64 protocol_version = 8;
+  string signup_id = 9;
 }
 
 // Appointment metadata for verification purposes

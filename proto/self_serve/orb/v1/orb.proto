@@ -31,6 +31,7 @@ message UserDataFailure {
     INVALID_REQUEST_DATA = 2;
     BYPASS_AGE_TOKEN_INVALID = 3;
     UNKNOWN = 4;
+    USER_DATA_NOT_RECEIVED = 5;
   }
 
   ErrorType error_type = 1;
