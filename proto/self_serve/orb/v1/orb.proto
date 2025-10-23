@@ -105,3 +105,8 @@ message PreflightCheck {
 
   Status status = 1;
 }
+
+message PhoneNodeInfo {
+  string node_id = 1;
+  string ip_port = 2;
+}
