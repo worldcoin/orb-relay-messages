@@ -11,9 +11,14 @@ client = []
 server = []
 
 [dependencies]
+blake3 = "1"
 prost.workspace = true
 prost-types.workspace = true
 tonic = { workspace = true, features = ["tls"] }
+
+[dev-dependencies]
+orb-qr-link.workspace = true
+uuid.workspace = true
 
 [build-dependencies]
 tonic-build.workspace = true

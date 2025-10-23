@@ -13,7 +13,7 @@ jobs:
     name: Format
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # pin@v4.1.7
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # pin@v4.3.0
       - uses: bufbuild/buf-setup-action@35c243d7f2a909b1d4e40399b348a7fdab27d78d # pin@v1.34.0
         with:
           version: "1.34.0"
@@ -21,5 +21,3 @@ jobs:
 
       - name: Check Protobuf Format
         run: buf format -d --exit-code
-
-

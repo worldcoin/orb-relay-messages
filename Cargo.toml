@@ -10,8 +10,9 @@ rust-version = "1.88.0"                                        # See rust-versio
 
 [workspace.dependencies]
 # first party
-orb-relay-messages = { path = "rust" }
+orb-qr-link = { git = "https://github.com/worldcoin/orb-software.git", rev = "a807c0de0729a5a899b7c887da8bcecf2881e300" }
 orb-relay-client = { path = "relay-client" }
+orb-relay-messages = { path = "rust" }
 orb-relay-test-utils = { path = "test-utils" }
 
 # third party
