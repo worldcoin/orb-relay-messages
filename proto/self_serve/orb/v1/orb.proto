@@ -15,6 +15,7 @@ message W {
     AppointmentFailure appointment_failure = 7;
     AppointmentTimeout appointment_timeout = 8;
     UserDataFailure user_data_failure = 9;
+    PhoneNodeInfo phone_node_info = 10;
   }
 }
 
@@ -104,4 +105,9 @@ message PreflightCheck {
   }
 
   Status status = 1;
+}
+
+message PhoneNodeInfo {
+  string node_id = 1;
+  string ip_port = 2;
 }
