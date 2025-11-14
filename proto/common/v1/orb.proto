@@ -73,4 +73,5 @@ message AnnounceAppId {
   AppAuthenticatedData app_data = 3;
   AppointmentMetadata appointment_metadata = 4;
   string bypass_age_verification_token = 5;
+  bool is_test = 6;
 }
