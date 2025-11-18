@@ -9,7 +9,7 @@ use orb_relay_messages::relay::{
     Entity, RelayConnectRequest, RelayConnectResponse, RelayPayload,
 };
 use secrecy::ExposeSecret;
-use std::{collections::HashMap, time::Duration};
+use std::collections::HashMap;
 use tokio::{task, time};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
@@ -379,13 +379,15 @@ async fn connect(
         client_id,
         namespace,
         entity_type,
+        keep_alive_interval,
+        keep_alive_timeout,
         ..
     } = opts;
 
     let mut endpoint = Endpoint::from_shared(domain.clone())?
         .keep_alive_while_idle(true)
-        .http2_keep_alive_interval(Duration::from_secs(30))
-        .keep_alive_timeout(Duration::from_secs(10));
+        .http2_keep_alive_interval(*keep_alive_interval)
+        .keep_alive_timeout(*keep_alive_timeout);
 
     if domain.starts_with("https://") {
         let tls_config = ClientTlsConfig::new().with_native_roots();
