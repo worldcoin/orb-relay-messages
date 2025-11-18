@@ -250,6 +250,10 @@ pub struct ClientOpts {
     heartbeat: Duration,
     #[builder(default = Amount::Infinite)]
     max_message_attempts: Amount,
+    #[builder(default = Duration::from_secs(30))]
+    keep_alive_interval: Duration,
+    #[builder(default = Duration::from_secs(10))]
+    keep_alive_timeout: Duration,
 }
 
 impl Client {
