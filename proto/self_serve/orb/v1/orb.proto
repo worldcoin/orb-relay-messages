@@ -101,6 +101,9 @@ message PreflightCheck {
     STATUS_FACE_GLASSES = 13;
     STATUS_FACE_MASK = 14;
     STATUS_HAIR_OCCLUSION = 15;
+    STATUS_FACE_SUNGLASSES = 16;
+    STATUS_FACE_SEGMENT_OCCLUSION = 17;
+    STATUS_OTHER = 18;
   }
 
   Status status = 1;
