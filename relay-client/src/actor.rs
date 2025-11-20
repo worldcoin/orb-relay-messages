@@ -17,7 +17,7 @@ use tonic::{
     transport::{ClientTlsConfig, Endpoint},
     Streaming,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 #[derive(Default)]
 pub struct State {
@@ -66,6 +66,8 @@ pub(crate) enum Msg {
     Stop,
 
     Heartbeat,
+
+    Reconnect,
 }
 
 pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err>>) {
@@ -74,11 +76,9 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
         let mut state = State::default();
-        let mut conn_attempts = 0_u64;
+        let mut conn_attempts = 1_u64;
 
         loop {
-            conn_attempts += 1;
-
             let cancellation_token = CancellationToken::new();
             let result = main_loop(
                 &mut state,
@@ -91,17 +91,29 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
 
             if let Err(e) = result {
                 cancellation_token.cancel();
-                if let Err::StopRequest = e {
-                    return Err(Err::StopRequest);
-                } else if props.opts.max_connection_attempts <= conn_attempts {
-                    return Err(e);
-                } else {
-                    error!(
-                        "RelayClient errored out {e:?}. Retrying in {}s",
-                        props.opts.connection_timeout.as_secs()
-                    );
 
-                    time::sleep(props.opts.connection_backoff).await;
+                match e {
+                    Err::StopRequest => return Ok(()),
+
+                    Err::ReconnectRequest => {
+                        warn!("Relay client was manually requested to reconnect");
+                        continue;
+                    }
+
+                    _ if props.opts.max_connection_attempts <= conn_attempts => {
+                        return Err(e)
+                    }
+
+                    _ => {
+                        conn_attempts += 1;
+
+                        error!(
+                            "RelayClient errored out {e:?}. Retrying in {}s",
+                            props.opts.connection_timeout.as_secs()
+                        );
+
+                        time::sleep(props.opts.connection_backoff).await;
+                    }
                 }
             };
         }
@@ -195,6 +207,8 @@ fn handle_msg(
         }
 
         Msg::Stop => return Err(Err::StopRequest),
+
+        Msg::Reconnect => return Err(Err::ReconnectRequest),
 
         Msg::WaitForAck {
             original_msg,

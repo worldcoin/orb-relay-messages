@@ -169,6 +169,7 @@ impl RecvMessage {
 #[derive(From, Debug)]
 pub enum Err {
     StopRequest,
+    ReconnectRequest,
     StreamEnded,
     Channel(flume::RecvError),
     Transport(transport::Error),
@@ -313,6 +314,22 @@ impl Client {
         self.actor_tx
             .send(actor::Msg::Stop)
             .wrap_err("actor_tx failed to send Stop message")?;
+
+        Ok(())
+    }
+
+    /// Forces the client to reconnect.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let (client, handle) = Client::connect(opts);
+    ///
+    /// client.reconnect().await?;
+    /// ```
+    pub async fn reconnect(&self) -> Result<(), Err> {
+        self.actor_tx
+            .send(actor::Msg::Reconnect)
+            .wrap_err("actor_tx failed to send Reconnect message")?;
 
         Ok(())
     }

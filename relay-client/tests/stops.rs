@@ -1,4 +1,4 @@
-use orb_relay_client::{Amount, Auth, Client, ClientOpts, Err, SendMessage};
+use orb_relay_client::{Amount, Auth, Client, ClientOpts, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
@@ -55,7 +55,7 @@ async fn it_stops_sever_when_stop_is_called() {
     assert_eq!(*sv.state().await, 1);
     let stop_fut = async {
         match handle.await {
-            Ok(Err(Err::StopRequest)) => (),
+            Ok(Ok(())) => (),
             other => panic!("unexpected terminatin of client handle: {other:?}"),
         }
     };
