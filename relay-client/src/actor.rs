@@ -15,7 +15,7 @@ use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 use tonic::{
     transport::{ClientTlsConfig, Endpoint},
-    Streaming,
+    Request, Streaming,
 };
 use tracing::{debug, error, info, warn};
 
@@ -410,7 +410,18 @@ async fn connect(
 
     let channel = endpoint.connect().await?;
 
-    let mut relay_client = RelayServiceClient::new(channel);
+    // Add x-client-id header for Cloudflare rate limiting
+    let metadata_value = client_id
+        .parse()
+        .wrap_err("Failed to parse client_id as metadata value")?;
+    let mut relay_client = RelayServiceClient::with_interceptor(
+        channel,
+        move |mut req: Request<()>| {
+            req.metadata_mut()
+                .insert("x-client-id", metadata_value.clone());
+            Ok(req)
+        },
+    );
 
     tonic_tx
         .send(RelayConnectRequest {
