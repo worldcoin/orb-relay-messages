@@ -15,6 +15,7 @@ message W {
     AppointmentFailure appointment_failure = 7;
     AppointmentTimeout appointment_timeout = 8;
     UserDataFailure user_data_failure = 9;
+    OrbBusy orb_busy = 10;
   }
 }
 
@@ -82,6 +83,8 @@ message SignupEnded {
   repeated FailureFeedbackType failure_feedback = 2;
 }
 message AgeVerificationRequiredFromOperator {}
+
+message OrbBusy {}
 
 message PreflightCheck {
   enum Status {
