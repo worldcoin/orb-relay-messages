@@ -7,10 +7,10 @@ fn main() {
     config
         .enable_type_names()
         .type_name_domain(["."], "type.googleapis.com");
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .build_client(cfg!(feature = "client"))
         .build_server(cfg!(feature = "server"))
-        .compile_protos_with_config(
+        .compile_with_config(
             config,
             &[
                 "./proto/relay.proto",
