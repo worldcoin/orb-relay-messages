@@ -21,6 +21,7 @@ use tonic::{
 use tracing::{debug, error, info, warn};
 
 const X_CLIENT_ID_HEADER: &str = "x-client-id";
+const X_DEVICE_TYPE_HEADER: &str = "x-device-type";
 
 #[derive(Default)]
 pub struct State {
@@ -414,13 +415,16 @@ async fn connect(
     let channel = endpoint.connect().await?;
 
     // Pre-parse client_id for x-client-id header (Cloudflare rate limiting)
-    let metadata_value = MetadataValue::try_from(client_id.as_str()).wrap_err(
+    let client_id_value = MetadataValue::try_from(client_id.as_str()).wrap_err(
         "Failed to convert client_id to metadata value (must be valid ASCII)",
     )?;
+    let device_type_value = MetadataValue::from_static("orb");
     let mut relay_client =
         RelayServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut()
-                .insert(X_CLIENT_ID_HEADER, metadata_value.clone());
+                .insert(X_CLIENT_ID_HEADER, client_id_value.clone());
+            req.metadata_mut()
+                .insert(X_DEVICE_TYPE_HEADER, device_type_value.clone());
             Ok(req)
         });
 
