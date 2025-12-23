@@ -18,32 +18,18 @@ message Heartbeat {
 }
 message NoState {}
 message AnnounceOrbId {
-  enum ModeType {
-    MODE_TYPE_UNSPECIFIED = 0;
-    MODE_TYPE_LEGACY = 1;
-    MODE_TYPE_SELF_SERVE = 2;
-  }
-
   enum HardwareType {
     HARDWARE_TYPE_UNSPECIFIED = 0;
     HARDWARE_TYPE_PEARL = 1;
     HARDWARE_TYPE_DIAMOND = 2;
   }
 
-  enum Selector {
-    SELECTOR_UNSPECIFIED = 0;
-    SELECTOR_ONE = 1;
-    SELECTOR_TWO = 2;
-    SELECTOR_THREE = 3;
-    SELECTOR_FOUR = 4;
-  }
-
   string orb_id = 1;
-  ModeType mode_type = 2;
+  // ModeType mode_type = 2;
   HardwareType hardware_type = 3;
-  bool has_preflight_checks = 4;
-  bool has_preflight_checks_with_occlusion = 5;
-  Selector selector = 6;
+  // bool has_preflight_checks = 4;
+  // bool has_preflight_checks_with_occlusion = 5;
+  // Selector selector = 6;
   bool heartbeat = 7;
   uint64 protocol_version = 8;
   string signup_id = 9;
