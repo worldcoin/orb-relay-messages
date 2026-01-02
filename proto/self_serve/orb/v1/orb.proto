@@ -16,6 +16,7 @@ message W {
     AppointmentTimeout appointment_timeout = 8;
     UserDataFailure user_data_failure = 9;
     OrbBusy orb_busy = 10;
+    PairingAccepted pairing_accepted = 11;
   }
 }
 
@@ -86,6 +87,9 @@ message SignupEnded {
 message AgeVerificationRequiredFromOperator {}
 
 message OrbBusy {}
+message PairingAccepted {
+  string encrypted_pairing_token = 1;
+}
 
 message PreflightCheck {
   enum Status {
