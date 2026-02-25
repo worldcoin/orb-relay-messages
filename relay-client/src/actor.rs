@@ -195,7 +195,7 @@ fn handle_msg(
             handle_payload(state, recv_msg, seq, &props.client_tx)?;
         }
 
-        Msg::RelayResponse(relay_connect_response::Msg::Ack(Ack { seq })) => {
+        Msg::RelayResponse(relay_connect_response::Msg::Ack(Ack { seq, .. })) => {
             handle_ack(state, seq)
         }
 

@@ -30,6 +30,7 @@ message Heartbeat {
 
 message Ack {
   uint64 seq = 1;
+  optional uint32 subscriber_count = 2;
 }
 
 message Entity {

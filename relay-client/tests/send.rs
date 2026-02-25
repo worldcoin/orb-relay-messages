@@ -116,7 +116,11 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
             state.push(conn_req.clone());
 
             if state.len() >= max_attempts {
-                Ack { seq }.into_res()
+                Ack {
+                    seq,
+                    ..Default::default()
+                }
+                .into_res()
             } else {
                 None
             }
