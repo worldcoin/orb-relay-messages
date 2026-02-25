@@ -28,15 +28,9 @@ message Heartbeat {
   uint64 seq = 1;
 }
 
-enum DeliveryStatus {
-  DELIVERY_STATUS_UNKNOWN = 0;
-  DELIVERY_STATUS_DELIVERED = 1;
-  DELIVERY_STATUS_NO_SUBSCRIBER = 2;
-}
-
 message Ack {
   uint64 seq = 1;
-  DeliveryStatus delivery_status = 2;
+  optional uint32 subscriber_count = 2;
 }
 
 message Entity {
