@@ -17,6 +17,15 @@ message Heartbeat {
   uint64 seq = 1;
 }
 message NoState {}
+// iroh P2P node addressing information for direct phone-orb connectivity.
+// Exchanged inside AnnounceOrbId / AnnounceAppId so both sides can establish
+// a direct QUIC connection without going through the relay service.
+message P2pNodeInfo {
+  string node_id = 1;                    // iroh EndpointId, base32 encoded
+  repeated string direct_addresses = 2;  // "IP:PORT" socket address strings
+  string relay_url = 3;                  // iroh relay URL for NAT traversal
+}
+
 message AnnounceOrbId {
   enum ModeType {
     MODE_TYPE_UNSPECIFIED = 0;
@@ -48,6 +57,7 @@ message AnnounceOrbId {
   uint64 protocol_version = 8;
   string signup_id = 9;
   string signup_id_pin = 10;
+  P2pNodeInfo p2p_node_info = 11;
 }
 
 // Appointment metadata for verification purposes
@@ -74,4 +84,5 @@ message AnnounceAppId {
   AppointmentMetadata appointment_metadata = 4;
   string bypass_age_verification_token = 5;
   bool is_test = 6;
+  P2pNodeInfo p2p_node_info = 7;
 }
