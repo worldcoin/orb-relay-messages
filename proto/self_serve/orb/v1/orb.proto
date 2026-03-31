@@ -16,6 +16,7 @@ message W {
     AppointmentTimeout appointment_timeout = 8;
     UserDataFailure user_data_failure = 9;
     OrbBusy orb_busy = 10;
+    PcpBlobReady pcp_blob_ready = 11;
   }
 }
 
@@ -86,6 +87,13 @@ message SignupEnded {
 message AgeVerificationRequiredFromOperator {}
 
 message OrbBusy {}
+
+message PcpBlobReady {
+  string blob_ticket = 1;
+  string signup_id = 2;
+  uint32 tier = 3;
+  uint64 size_bytes = 4;
+}
 
 message PreflightCheck {
   enum Status {
