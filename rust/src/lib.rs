@@ -47,6 +47,9 @@ pub mod common {
             /// `hash` and checks if both hashes are identical.
             pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
+                if external_hash.is_empty() {
+                    return false;
+                }
                 let internal_hash = self.hash(external_hash.len());
                 external_hash == internal_hash
             }
@@ -103,5 +106,74 @@ pub mod config {
 pub mod jobs {
     pub mod v1 {
         tonic::include_proto!("jobs.v1");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::common::v1::AppAuthenticatedData;
+
+    fn sample_data() -> AppAuthenticatedData {
+        AppAuthenticatedData {
+            self_custody_public_key: "pk_abc123".into(),
+            identity_commitment: "ic_def456".into(),
+            os: "iOS".into(),
+            os_version: "18.0".into(),
+            pcp_version: 2,
+        }
+    }
+
+    #[test]
+    fn verify_rejects_empty_hash() {
+        let data = sample_data();
+        assert!(!data.verify(b""), "empty hash must not verify");
+        assert!(!data.verify(Vec::<u8>::new()), "empty vec must not verify");
+    }
+
+    #[test]
+    fn verify_accepts_correct_hash() {
+        let data = sample_data();
+        let hash = data.hash(32);
+        assert!(data.verify(&hash));
+    }
+
+    #[test]
+    fn verify_rejects_wrong_hash() {
+        let data = sample_data();
+        let mut hash = data.hash(32);
+        hash[0] ^= 0xff;
+        assert!(!data.verify(&hash));
+    }
+
+    #[test]
+    fn verify_accepts_shorter_hash_due_to_xof_prefix_consistency() {
+        // BLAKE3 XOF is prefix-consistent: first N bytes of hash(M) == hash(N) for N < M
+        let data = sample_data();
+        let hash = data.hash(32);
+        assert!(data.verify(&hash[..16]));
+    }
+
+    #[test]
+    fn hash_length_matches_requested() {
+        let data = sample_data();
+        for n in [1, 16, 32, 64] {
+            assert_eq!(data.hash(n).len(), n);
+        }
+    }
+
+    #[test]
+    fn different_data_produces_different_hash() {
+        let data1 = sample_data();
+        let mut data2 = sample_data();
+        data2.identity_commitment = "ic_different".into();
+        assert_ne!(data1.hash(32), data2.hash(32));
+    }
+
+    #[test]
+    fn pcp_version_affects_hash_when_non_default() {
+        let data_default = sample_data(); // pcp_version = 2 (default)
+        let mut data_v3 = sample_data();
+        data_v3.pcp_version = 3;
+        assert_ne!(data_default.hash(32), data_v3.hash(32));
     }
 }
