@@ -79,11 +79,13 @@ async fn asks_at_most_once() {
             id: "apple".to_string(),
             entity_type: EntityType::App as i32,
             namespace: "green".to_string(),
+            ..Default::default()
         }),
         dst: Some(Entity {
             id: "banana".to_string(),
             entity_type: EntityType::Orb as i32,
             namespace: "yellow".to_string(),
+            ..Default::default()
         }),
         seq: 0,
         payload: Some(Any {
@@ -163,11 +165,13 @@ async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
             id: "papaya".to_string(),
             entity_type: EntityType::App as i32,
             namespace: "orange".to_string(),
+            ..Default::default()
         }),
         dst: Some(Entity {
             id: "blueberry".to_string(),
             entity_type: EntityType::Orb as i32,
             namespace: "purple".to_string(),
+            ..Default::default()
         }),
         seq: 0,
         payload: Some(Any {
@@ -252,11 +256,13 @@ async fn ask_increases_seq() {
                 id: "apple".to_string(),
                 entity_type: EntityType::App as i32,
                 namespace: "green".to_string(),
+                ..Default::default()
             }),
             dst: Some(Entity {
                 id: "banana".to_string(),
                 entity_type: EntityType::Orb as i32,
                 namespace: "yellow".to_string(),
+                ..Default::default()
             }),
             seq,
             payload: Some(Any {

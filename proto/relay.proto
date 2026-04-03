@@ -35,7 +35,7 @@ message Ack {
 
 enum Namespace {
   NAMESPACE_UNSPECIFIED = 0;
-  NAMESPACE_WORLD_PAIRING = 1;
+  NAMESPACE_TFH_PAIRING = 1;
 }
 
 message Entity {
@@ -48,7 +48,8 @@ message Entity {
 
   string id = 1;
   EntityType entity_type = 2;
-  string namespace = 3;
+  string namespace = 3; // deprecated: use namespace_type instead
+  Namespace namespace_type = 4;
 }
 
 message ConnectRequest {
