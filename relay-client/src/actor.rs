@@ -435,6 +435,7 @@ async fn connect(
                     id: client_id.clone(),
                     entity_type: *entity_type as i32,
                     namespace: namespace.clone(),
+                    ..Default::default()
                 }),
                 auth_method: Some(match auth {
                     Auth::Token(t) => AuthMethod::Token(t.expose_secret().to_string()),
