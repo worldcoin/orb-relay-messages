@@ -68,14 +68,12 @@ async fn sends_at_most_once_and_increases_seq() {
         id: "foo".to_string(),
         entity_type: EntityType::App as i32,
         namespace: "bar".to_string(),
-        ..Default::default()
     });
 
     let dst = Some(Entity {
         id: "thomas".to_string(),
         entity_type: EntityType::Orb as i32,
         namespace: "anderson".to_string(),
-        ..Default::default()
     });
 
     let expected = [
@@ -163,13 +161,11 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
             id: "foo".to_string(),
             entity_type: EntityType::App as i32,
             namespace: "bar".to_string(),
-            ..Default::default()
         }),
         dst: Some(Entity {
             id: "thomas".to_string(),
             entity_type: EntityType::Orb as i32,
             namespace: "anderson".to_string(),
-            ..Default::default()
         }),
         seq: 0,
         payload: Some(Any {
