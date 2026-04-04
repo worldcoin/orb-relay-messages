@@ -48,8 +48,7 @@ message Entity {
 
   string id = 1;
   EntityType entity_type = 2;
-  string namespace = 3; // deprecated: use namespace_type instead
-  Namespace namespace_type = 4;
+  string namespace = 3;
 }
 
 message ConnectRequest {
