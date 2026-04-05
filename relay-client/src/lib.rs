@@ -119,13 +119,11 @@ impl RecvMessage {
                 id: self.client.opts.client_id.clone(),
                 entity_type: self.client.opts.entity_type as i32,
                 namespace: self.client.opts.namespace.clone(),
-                ..Default::default()
             }),
             dst: Some(Entity {
                 id: self.from.id.clone(),
                 entity_type: self.from.entity_type,
                 namespace: self.from.namespace.clone(),
-                ..Default::default()
             }),
             seq: self.seq,
             payload: Some(Any {
@@ -463,13 +461,11 @@ pub(crate) fn relay_payload(
             id: opts.client_id.clone(),
             entity_type: opts.entity_type as i32,
             namespace: opts.namespace.clone(),
-            ..Default::default()
         }),
         dst: Some(Entity {
             id: msg.target_id.clone(),
             entity_type: msg.target_type as i32,
             namespace: msg.target_namespace.clone(),
-            ..Default::default()
         }),
         seq,
         payload: Some(Any {
