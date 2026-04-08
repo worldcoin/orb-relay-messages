@@ -33,6 +33,11 @@ message Ack {
   optional uint32 subscriber_count = 2;
 }
 
+enum Namespace {
+  NAMESPACE_UNSPECIFIED = 0;
+  NAMESPACE_TFH_PAIRING = 1;
+}
+
 message Entity {
   enum EntityType {
     ENTITY_TYPE_UNSPECIFIED = 0;
