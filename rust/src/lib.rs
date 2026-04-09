@@ -39,12 +39,24 @@ pub mod common {
         /// Default PCP version value (proto3 default for uint32)
         const PCP_VERSION_DEFAULT: u32 = 2;
 
-        /// Extension methods for [`AppAuthenticatedData`] that provide hashing and verification functionality.
         impl AppAuthenticatedData {
-            /// Returns `true` if `hash` is a BLAKE3 hash of this [`AppAuthenticatedData`].
+            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
+            /// using length-prefixed BLAKE3 hashing.
             ///
-            /// This method calculates its own hash of the same length as the input
-            /// `hash` and checks if both hashes are identical.
+            /// Use this for QR v5+ verification.
+            pub fn verify_with_length_prefix(&self, hash: impl AsRef<[u8]>) -> bool {
+                let external_hash = hash.as_ref();
+                if external_hash.is_empty() {
+                    return false;
+                }
+                let internal_hash = self.hash_with_length_prefix(external_hash.len());
+                external_hash == internal_hash
+            }
+
+            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
+            /// using the legacy (unfixed) hashing.
+            ///
+            /// Use this for QR v4 verification. Do not use for new code.
             pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
@@ -54,7 +66,36 @@ pub mod common {
                 external_hash == internal_hash
             }
 
-            /// Calculates a BLAKE3 hash of the length `n`.
+            /// Calculates a BLAKE3 hash of length `n` with length-prefixed fields,
+            /// ensuring proper domain separation between variable-length inputs.
+            pub fn hash_with_length_prefix(&self, n: usize) -> Vec<u8> {
+                let mut hasher = Hasher::new();
+                let Self {
+                    identity_commitment,
+                    self_custody_public_key,
+                    pcp_version,
+                    os_version,
+                    os,
+                } = self;
+                hasher.update(&(identity_commitment.len() as u32).to_le_bytes());
+                hasher.update(identity_commitment.as_bytes());
+                hasher.update(&(self_custody_public_key.len() as u32).to_le_bytes());
+                hasher.update(self_custody_public_key.as_bytes());
+                hasher.update(&(os_version.len() as u32).to_le_bytes());
+                hasher.update(os_version.as_bytes());
+                hasher.update(&(os.len() as u32).to_le_bytes());
+                hasher.update(os.as_bytes());
+                hasher.update(&pcp_version.to_le_bytes());
+                let mut output = vec![0; n];
+                hasher.finalize_xof().fill(&mut output);
+                output
+            }
+
+            /// Calculates a BLAKE3 hash of length `n` using the legacy (unfixed) method.
+            ///
+            /// This method concatenates fields without length prefixes, which allows
+            /// hash collisions by shifting bytes between adjacent fields.
+            /// Kept for backward compatibility with QR v4. Do not use for new code.
             pub fn hash(&self, n: usize) -> Vec<u8> {
                 let mut hasher = Hasher::new();
                 self.hasher_update(&mut hasher);
@@ -63,10 +104,7 @@ pub mod common {
                 output
             }
 
-            /// Updates the provided BLAKE3 hasher with all fields of this [`AppAuthenticatedData`].
-            ///
-            /// This method must hash every field in the struct to ensure complete validation.
-            pub fn hasher_update(&self, hasher: &mut Hasher) {
+            fn hasher_update(&self, hasher: &mut Hasher) {
                 let Self {
                     identity_commitment,
                     self_custody_public_key,
@@ -175,5 +213,85 @@ mod tests {
         let mut data_v3 = sample_data();
         data_v3.pcp_version = 3;
         assert_ne!(data_default.hash(32), data_v3.hash(32));
+    }
+
+    // --- hash_with_length_prefix tests ---
+
+    #[test]
+    fn length_prefix_verify_accepts_correct_hash() {
+        let data = sample_data();
+        let hash = data.hash_with_length_prefix(32);
+        assert!(data.verify_with_length_prefix(&hash));
+    }
+
+    #[test]
+    fn length_prefix_verify_rejects_empty_hash() {
+        let data = sample_data();
+        assert!(!data.verify_with_length_prefix(b""));
+    }
+
+    #[test]
+    fn length_prefix_verify_rejects_wrong_hash() {
+        let data = sample_data();
+        let mut hash = data.hash_with_length_prefix(32);
+        hash[0] ^= 0xff;
+        assert!(!data.verify_with_length_prefix(&hash));
+    }
+
+    #[test]
+    fn length_prefix_hash_differs_from_legacy() {
+        let data = sample_data();
+        assert_ne!(data.hash(32), data.hash_with_length_prefix(32));
+    }
+
+    #[test]
+    fn length_prefix_prevents_field_boundary_collision() {
+        // With the legacy hash, shifting bytes between adjacent fields
+        // can produce a collision. With length prefixes, it cannot.
+        let data_a = AppAuthenticatedData {
+            identity_commitment: "abc".into(),
+            self_custody_public_key: "def".into(),
+            os: "iOS".into(),
+            os_version: "18.0".into(),
+            pcp_version: 2,
+        };
+        let data_b = AppAuthenticatedData {
+            identity_commitment: "ab".into(),
+            self_custody_public_key: "cdef".into(),
+            os: "iOS".into(),
+            os_version: "18.0".into(),
+            pcp_version: 2,
+        };
+        // Legacy hash: these collide because "abc"+"def" == "ab"+"cdef"
+        assert_eq!(data_a.hash(32), data_b.hash(32));
+        // Length-prefixed hash: these do NOT collide
+        assert_ne!(
+            data_a.hash_with_length_prefix(32),
+            data_b.hash_with_length_prefix(32)
+        );
+    }
+
+    #[test]
+    fn length_prefix_pcp_version_always_included() {
+        // Unlike legacy hash, pcp_version is always hashed (even when default)
+        // so we just verify the hash is stable and different from non-default
+        let data_default = sample_data(); // pcp_version = 2
+        let mut data_v3 = sample_data();
+        data_v3.pcp_version = 3;
+        assert_ne!(
+            data_default.hash_with_length_prefix(32),
+            data_v3.hash_with_length_prefix(32)
+        );
+    }
+
+    #[test]
+    fn legacy_and_length_prefix_are_not_cross_compatible() {
+        let data = sample_data();
+        let legacy_hash = data.hash(32);
+        let lp_hash = data.hash_with_length_prefix(32);
+        // Legacy hash should not verify with length-prefix verifier
+        assert!(!data.verify_with_length_prefix(&legacy_hash));
+        // Length-prefix hash should not verify with legacy verifier
+        assert!(!data.verify(&lp_hash));
     }
 }
