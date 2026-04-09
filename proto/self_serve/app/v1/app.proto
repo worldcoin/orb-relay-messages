@@ -10,6 +10,7 @@ message W {
     RequestState request_state = 2;
     AbortSignup abort_signup = 3;
     PairingRequest pairing_request = 4;
+    PcpBlobTransferComplete pcp_blob_transfer_complete = 5;
   }
 }
 
@@ -20,4 +21,11 @@ message PairingRequest {
   string app_id = 1;
   bytes user_data_hash = 2;
   string public_key = 3;
+}
+
+message PcpBlobTransferComplete {
+  string signup_id = 1;
+  uint32 tier = 2;
+  bool success = 3;
+  string error = 4;
 }
