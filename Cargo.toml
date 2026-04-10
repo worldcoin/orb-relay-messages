@@ -17,7 +17,7 @@ orb-relay-test-utils = { path = "test-utils" }
 
 # third party
 async-stream = "0.3.6"
-flume = "0.11.1"
+flume = "0.12.0"
 prost = "0.14.1"
 prost-build = "0.14.1"
 prost-types = "0.14.1"

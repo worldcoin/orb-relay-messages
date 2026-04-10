@@ -77,6 +77,7 @@ message AppAuthenticatedData {
   string os = 3;
   string os_version = 4;
   uint32 pcp_version = 5;
+  uint32 version = 6;
 }
 
 message AnnounceAppId {
