@@ -39,11 +39,31 @@ pub mod common {
         /// Default PCP version value (proto3 default for uint32)
         const PCP_VERSION_DEFAULT: u32 = 2;
 
+        /// Version prefix for self-describing hash format (v5).
+        const HASH_VERSION_V5: u8 = 0x05;
+
         impl AppAuthenticatedData {
-            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
-            /// using length-prefixed BLAKE3 hashing.
+            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`].
             ///
-            /// Use this for QR v5+ verification.
+            /// Dispatches based on the hash format:
+            /// - `0x05` prefix → v5 (length-prefixed BLAKE3)
+            /// - no recognized prefix → v4 legacy (plain BLAKE3)
+            pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
+                let hash = hash.as_ref();
+                if hash.is_empty() {
+                    return false;
+                }
+                if hash.first() == Some(&HASH_VERSION_V5) {
+                    self.verify_with_length_prefix(&hash[1..])
+                } else {
+                    self.verify_legacy(hash)
+                }
+            }
+
+            /// Returns `true` if `hash` matches using length-prefixed BLAKE3.
+            ///
+            /// Prefer [`Self::verify()`] which handles version dispatch
+            /// automatically.
             pub fn verify_with_length_prefix(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
@@ -53,17 +73,29 @@ pub mod common {
                 external_hash == internal_hash
             }
 
-            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
-            /// using the legacy (unfixed) hashing.
+            /// Returns `true` if `hash` matches using legacy (unfixed) hashing.
             ///
-            /// Use this for QR v4 verification. Do not use for new code.
-            pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
+            /// For QR v4 backward compatibility only. Do not use for new code.
+            pub fn verify_legacy(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
                     return false;
                 }
-                let internal_hash = self.hash(external_hash.len());
+                let internal_hash = self.hash_legacy(external_hash.len());
                 external_hash == internal_hash
+            }
+
+            /// Calculates a self-describing BLAKE3 hash with version prefix.
+            ///
+            /// Returns `0x05 ++ BLAKE3(length-prefixed fields)` where the BLAKE3
+            /// digest is truncated to `truncate_to` bytes. The total output
+            /// length is `truncate_to + 1`.
+            pub fn hash(&self, truncate_to: usize) -> Vec<u8> {
+                let digest = self.hash_with_length_prefix(truncate_to);
+                let mut out = Vec::with_capacity(1 + digest.len());
+                out.push(HASH_VERSION_V5);
+                out.extend_from_slice(&digest);
+                out
             }
 
             /// Calculates a BLAKE3 hash of length `n` with length-prefixed fields,
@@ -91,12 +123,14 @@ pub mod common {
                 output
             }
 
-            /// Calculates a BLAKE3 hash of length `n` using the legacy (unfixed) method.
+            /// Calculates a BLAKE3 hash of length `n` using the legacy (unfixed)
+            /// method.
             ///
-            /// This method concatenates fields without length prefixes, which allows
-            /// hash collisions by shifting bytes between adjacent fields.
-            /// Kept for backward compatibility with QR v4. Do not use for new code.
-            pub fn hash(&self, n: usize) -> Vec<u8> {
+            /// This method concatenates fields without length prefixes, which
+            /// allows hash collisions by shifting bytes between adjacent fields.
+            /// Kept for backward compatibility with QR v4. Do not use for new
+            /// code.
+            pub fn hash_legacy(&self, n: usize) -> Vec<u8> {
                 let mut hasher = Hasher::new();
                 self.hasher_update(&mut hasher);
                 let mut output = vec![0; n];
@@ -161,6 +195,8 @@ mod tests {
         }
     }
 
+    // --- Self-describing verify() dispatcher tests ---
+
     #[test]
     fn verify_rejects_empty_hash() {
         let data = sample_data();
@@ -169,34 +205,59 @@ mod tests {
     }
 
     #[test]
-    fn verify_accepts_correct_hash() {
+    fn verify_accepts_self_describing_hash() {
         let data = sample_data();
         let hash = data.hash(32);
         assert!(data.verify(&hash));
     }
 
     #[test]
-    fn verify_rejects_wrong_hash() {
+    fn verify_accepts_legacy_hash() {
+        let data = sample_data();
+        let hash = data.hash_legacy(32);
+        assert!(data.verify(&hash));
+    }
+
+    #[test]
+    fn verify_rejects_wrong_self_describing_hash() {
         let data = sample_data();
         let mut hash = data.hash(32);
-        hash[0] ^= 0xff;
+        // Corrupt a digest byte (not the version prefix)
+        hash[1] ^= 0xff;
         assert!(!data.verify(&hash));
     }
 
     #[test]
-    fn verify_accepts_shorter_hash_due_to_xof_prefix_consistency() {
-        // BLAKE3 XOF is prefix-consistent: first N bytes of hash(M) == hash(N) for N < M
+    fn verify_rejects_wrong_legacy_hash() {
+        let data = sample_data();
+        let mut hash = data.hash_legacy(32);
+        hash[0] ^= 0xff;
+        assert!(!data.verify(&hash));
+    }
+
+    // --- Self-describing hash() tests ---
+
+    #[test]
+    fn hash_has_version_prefix() {
         let data = sample_data();
         let hash = data.hash(32);
-        assert!(data.verify(&hash[..16]));
+        assert_eq!(hash[0], 0x05, "first byte must be version prefix");
     }
 
     #[test]
-    fn hash_length_matches_requested() {
+    fn hash_length_is_digest_plus_one() {
         let data = sample_data();
         for n in [1, 16, 32, 64] {
-            assert_eq!(data.hash(n).len(), n);
+            assert_eq!(data.hash(n).len(), n + 1);
         }
+    }
+
+    #[test]
+    fn hash_digest_matches_hash_with_length_prefix() {
+        let data = sample_data();
+        let self_describing = data.hash(32);
+        let raw = data.hash_with_length_prefix(32);
+        assert_eq!(&self_describing[1..], &raw[..]);
     }
 
     #[test]
@@ -207,12 +268,55 @@ mod tests {
         assert_ne!(data1.hash(32), data2.hash(32));
     }
 
+    // --- Legacy hash tests ---
+
     #[test]
-    fn pcp_version_affects_hash_when_non_default() {
+    fn legacy_verify_rejects_empty_hash() {
+        let data = sample_data();
+        assert!(!data.verify_legacy(b""), "empty hash must not verify");
+        assert!(
+            !data.verify_legacy(Vec::<u8>::new()),
+            "empty vec must not verify"
+        );
+    }
+
+    #[test]
+    fn legacy_verify_accepts_correct_hash() {
+        let data = sample_data();
+        let hash = data.hash_legacy(32);
+        assert!(data.verify_legacy(&hash));
+    }
+
+    #[test]
+    fn legacy_verify_rejects_wrong_hash() {
+        let data = sample_data();
+        let mut hash = data.hash_legacy(32);
+        hash[0] ^= 0xff;
+        assert!(!data.verify_legacy(&hash));
+    }
+
+    #[test]
+    fn legacy_verify_accepts_shorter_hash_due_to_xof_prefix_consistency() {
+        // BLAKE3 XOF is prefix-consistent: first N bytes of hash(M) == hash(N) for N < M
+        let data = sample_data();
+        let hash = data.hash_legacy(32);
+        assert!(data.verify_legacy(&hash[..16]));
+    }
+
+    #[test]
+    fn legacy_hash_length_matches_requested() {
+        let data = sample_data();
+        for n in [1, 16, 32, 64] {
+            assert_eq!(data.hash_legacy(n).len(), n);
+        }
+    }
+
+    #[test]
+    fn legacy_pcp_version_affects_hash_when_non_default() {
         let data_default = sample_data(); // pcp_version = 2 (default)
         let mut data_v3 = sample_data();
         data_v3.pcp_version = 3;
-        assert_ne!(data_default.hash(32), data_v3.hash(32));
+        assert_ne!(data_default.hash_legacy(32), data_v3.hash_legacy(32));
     }
 
     // --- hash_with_length_prefix tests ---
@@ -241,7 +345,7 @@ mod tests {
     #[test]
     fn length_prefix_hash_differs_from_legacy() {
         let data = sample_data();
-        assert_ne!(data.hash(32), data.hash_with_length_prefix(32));
+        assert_ne!(data.hash_legacy(32), data.hash_with_length_prefix(32));
     }
 
     #[test]
@@ -263,7 +367,7 @@ mod tests {
             pcp_version: 2,
         };
         // Legacy hash: these collide because "abc"+"def" == "ab"+"cdef"
-        assert_eq!(data_a.hash(32), data_b.hash(32));
+        assert_eq!(data_a.hash_legacy(32), data_b.hash_legacy(32));
         // Length-prefixed hash: these do NOT collide
         assert_ne!(
             data_a.hash_with_length_prefix(32),
@@ -287,11 +391,11 @@ mod tests {
     #[test]
     fn legacy_and_length_prefix_are_not_cross_compatible() {
         let data = sample_data();
-        let legacy_hash = data.hash(32);
+        let legacy_hash = data.hash_legacy(32);
         let lp_hash = data.hash_with_length_prefix(32);
         // Legacy hash should not verify with length-prefix verifier
         assert!(!data.verify_with_length_prefix(&legacy_hash));
         // Length-prefix hash should not verify with legacy verifier
-        assert!(!data.verify(&lp_hash));
+        assert!(!data.verify_legacy(&lp_hash));
     }
 }

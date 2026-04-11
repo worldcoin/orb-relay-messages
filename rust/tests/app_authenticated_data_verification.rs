@@ -16,7 +16,7 @@ MCowBQYDK2VuAyEA2boNBmJX4lGkA9kjthS5crXOBxu2BPycKRMakpzgLG4=
         os: "Android".to_string(),
         os_version: "1.2.3".to_string(),
     };
-    let hash_app_data = app_data.hash(16);
+    let hash_app_data = app_data.hash_legacy(16);
     let qr = encode_static_qr(&orb_relay_id, hash_app_data);
     let (version, parsed_orb_relay_id, parsed_app_data) =
         decode_qr_with_version(&qr).unwrap();
@@ -39,7 +39,7 @@ MCowBQYDK2VuAyEA2boNBmJX4lGkA9kjthS5crXOBxu2BPycKRMakpzgLG4=
         os: "Android".to_string(),
         os_version: "1.2.3".to_string(),
     };
-    let hash_app_data = app_data.hash(16);
+    let hash_app_data = app_data.hash_legacy(16);
     let qr = encode_static_qr(&orb_relay_id, hash_app_data);
     let (version, parsed_orb_relay_id, parsed_app_data) =
         decode_qr_with_version(&qr).unwrap();
