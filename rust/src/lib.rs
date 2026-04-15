@@ -46,18 +46,22 @@ pub mod common {
             /// Returns `true` if `hash` matches this [`AppAuthenticatedData`].
             ///
             /// Dispatches based on the hash format:
-            /// - `0x05` prefix → v5 (length-prefixed BLAKE3)
-            /// - no recognized prefix → v4 legacy (plain BLAKE3)
+            /// - `0x05` prefix → try v5 (length-prefixed BLAKE3) first
+            /// - falls back to v4 legacy (plain BLAKE3)
+            ///
+            /// The fallback handles the case where a legacy hash happens to
+            /// start with `0x05` (~0.4% probability for random BLAKE3 output).
             pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
                 let hash = hash.as_ref();
                 if hash.is_empty() {
                     return false;
                 }
-                if hash.first() == Some(&HASH_VERSION_V5) {
-                    self.verify_with_length_prefix(&hash[1..])
-                } else {
-                    self.verify_legacy(hash)
+                if hash.first() == Some(&HASH_VERSION_V5)
+                    && self.verify_with_length_prefix(&hash[1..])
+                {
+                    return true;
                 }
+                self.verify_legacy(hash)
             }
 
             /// Returns `true` if `hash` matches using length-prefixed BLAKE3.
@@ -233,6 +237,26 @@ mod tests {
         let mut hash = data.hash_legacy(32);
         hash[0] ^= 0xff;
         assert!(!data.verify(&hash));
+    }
+
+    #[test]
+    fn verify_accepts_legacy_hash_starting_with_version_byte() {
+        // ~0.4% of legacy hashes start with 0x05 by chance. The dispatcher
+        // tries v5 first (which fails), then falls back to legacy.
+        // Brute-force an input whose legacy hash starts with 0x05.
+        let data = (0u32..)
+            .map(|i| AppAuthenticatedData {
+                identity_commitment: format!("ic_{i}"),
+                ..sample_data()
+            })
+            .find(|d| d.hash_legacy(32)[0] == 0x05)
+            .expect("should find a collision within a few hundred tries");
+        let hash = data.hash_legacy(32);
+        assert_eq!(hash[0], 0x05);
+        assert!(
+            data.verify(&hash),
+            "legacy hash starting with 0x05 must still verify"
+        );
     }
 
     // --- Self-describing hash() tests ---
