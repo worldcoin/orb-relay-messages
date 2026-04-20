@@ -4,9 +4,10 @@ use crate::{
 };
 use color_eyre::eyre::{eyre, Context};
 use orb_relay_messages::relay::{
-    connect_request::AuthMethod, relay_connect_request, relay_connect_response,
-    relay_service_client::RelayServiceClient, Ack, ConnectRequest, ConnectResponse,
-    Entity, RelayConnectRequest, RelayConnectResponse, RelayPayload,
+    connect_request::AuthMethod, entity::EntityType, relay_connect_request,
+    relay_connect_response, relay_service_client::RelayServiceClient, Ack,
+    ConnectRequest, ConnectResponse, Entity, RelayConnectRequest, RelayConnectResponse,
+    RelayPayload,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -418,7 +419,12 @@ async fn connect(
     let client_id_value = MetadataValue::try_from(client_id.as_str()).wrap_err(
         "Failed to convert client_id to metadata value (must be valid ASCII)",
     )?;
-    let device_type_value = MetadataValue::from_static("orb");
+    let device_type_value = MetadataValue::from_static(match entity_type {
+        EntityType::Orb => "orb",
+        EntityType::App => "app",
+        EntityType::Service => "service",
+        EntityType::Unspecified => "unspecified",
+    });
     let mut relay_client =
         RelayServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut()
