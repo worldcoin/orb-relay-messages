@@ -1,8 +1,10 @@
 fn main() {
-    assert!(
-        cfg!(any(feature = "client", feature = "server")),
-        "must specify at least one of the `client` or `server` features"
-    );
+    const {
+        assert!(
+            cfg!(any(feature = "client", feature = "server")),
+            "must specify at least one of the `client` or `server` features"
+        );
+    }
     let mut config = prost_build::Config::new();
     config
         .enable_type_names()

@@ -6,7 +6,7 @@ members = ["rust", "relay-client", "test-utils"]
 edition = "2021"
 license = "MIT OR (Apache-2.0 WITH LLVM-exception)"
 repository = "https://github.com/worldcoin/orb-relay-messages"
-rust-version = "1.88.0"                                        # See rust-version.toml
+rust-version = "1.94.1"                                        # See rust-version.toml
 
 [workspace.dependencies]
 # first party
