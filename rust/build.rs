@@ -6,7 +6,15 @@ fn main() {
     let mut config = prost_build::Config::new();
     config
         .enable_type_names()
-        .type_name_domain(["."], "type.googleapis.com");
+        .type_name_domain(["."], "type.googleapis.com")
+        .message_attribute(
+            ".self_serve.app.v1.AbortSignup",
+            "#[derive(serde::Serialize, schemars::JsonSchema)]",
+        )
+        .enum_attribute(
+            ".self_serve.app.v1.AbortSignup.Reason",
+            "#[derive(serde::Serialize, schemars::JsonSchema)]",
+        );
     tonic_prost_build::configure()
         .build_client(cfg!(feature = "client"))
         .build_server(cfg!(feature = "server"))
