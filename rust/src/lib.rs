@@ -44,11 +44,7 @@ pub mod common {
             pub const VERSION: u32 = 2;
 
             /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
-            /// using the hash format selected by `self.version`.
-            ///
-            /// `version == 0` is treated as legacy-compatible app data.
-            /// `version == 1` uses the length-prefixed format without `sub`.
-            /// `version == 2` uses the length-prefixed format including `sub`.
+            /// under the format selected by `self.version`.
             pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
@@ -96,10 +92,7 @@ pub mod common {
                 output
             }
 
-            /// Calculates the v1 length-prefixed BLAKE3 hash of length `n`.
-            ///
-            /// Kept for backward compatibility with producers that set
-            /// `version == 1` and do not include `sub` in the hash.
+            /// v1 length-prefixed BLAKE3 hash (no `sub`).
             fn hash_v1(&self, n: usize) -> Vec<u8> {
                 let mut hasher = Hasher::new();
                 let Self {
@@ -298,13 +291,6 @@ mod tests {
 
         assert!(v1_data.verify(&hash));
         assert!(!v2_data.verify(hash));
-    }
-
-    #[test]
-    fn v1_and_current_hashes_differ() {
-        let v1_data = app_data(1);
-        let v2_data = app_data(AppAuthenticatedData::VERSION);
-        assert_ne!(v1_hash(&v1_data, 16), current_hash(&v2_data, 16));
     }
 
     #[test]
