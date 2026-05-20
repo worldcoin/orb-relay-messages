@@ -41,14 +41,14 @@ pub mod common {
 
         impl AppAuthenticatedData {
             /// Current hash format version for new producers.
-            pub const VERSION: u32 = 1;
+            pub const VERSION: u32 = 2;
 
             /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
-            /// using the current hash format, or the legacy hash format for
-            /// app data from clients that do not send `version`.
+            /// using the hash format selected by `self.version`.
             ///
             /// `version == 0` is treated as legacy-compatible app data.
-            /// `version > 0` only accepts the current length-prefixed format.
+            /// `version == 1` uses the length-prefixed format without `sub`.
+            /// `version == 2` uses the length-prefixed format including `sub`.
             pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
@@ -56,6 +56,7 @@ pub mod common {
                 }
                 match self.version {
                     Self::VERSION => external_hash == self.hash(external_hash.len()),
+                    1 => external_hash == self.hash_v1(external_hash.len()),
                     0 => external_hash == self.legacy_hash(external_hash.len()),
                     _ => false,
                 }
@@ -74,8 +75,43 @@ pub mod common {
                     os_version,
                     pcp_version,
                     version,
+                    sub,
                 } = self;
                 assert_eq!(*version, Self::VERSION, "version != Self::VERSION");
+                for v in [
+                    self_custody_public_key,
+                    identity_commitment,
+                    os,
+                    os_version,
+                    sub,
+                ] {
+                    let len = u32::try_from(v.len()).expect("less than u32::MAX");
+                    hasher.update(&len.to_le_bytes());
+                    hasher.update(v.as_bytes());
+                }
+                hasher.update(&pcp_version.to_le_bytes());
+                hasher.update(&version.to_le_bytes());
+                let mut output = vec![0; n];
+                hasher.finalize_xof().fill(&mut output);
+                output
+            }
+
+            /// Calculates the v1 length-prefixed BLAKE3 hash of length `n`.
+            ///
+            /// Kept for backward compatibility with producers that set
+            /// `version == 1` and do not include `sub` in the hash.
+            fn hash_v1(&self, n: usize) -> Vec<u8> {
+                let mut hasher = Hasher::new();
+                let Self {
+                    self_custody_public_key,
+                    identity_commitment,
+                    os,
+                    os_version,
+                    pcp_version,
+                    version,
+                    sub: _,
+                } = self;
+                assert_eq!(*version, 1, "version != 1");
                 for v in [self_custody_public_key, identity_commitment, os, os_version]
                 {
                     let len = u32::try_from(v.len()).expect("less than u32::MAX");
@@ -103,6 +139,7 @@ pub mod common {
                     os,
                     pcp_version,
                     version: _,
+                    sub: _,
                 } = self;
                 for v in [identity_commitment, self_custody_public_key, os_version, os]
                 {
@@ -155,6 +192,7 @@ mod tests {
             os_version: "18.0".into(),
             pcp_version: 2,
             version,
+            sub: "sub_xyz789".into(),
         }
     }
 
@@ -180,6 +218,23 @@ mod tests {
         finish(hasher, n)
     }
 
+    fn v1_hash(data: &AppAuthenticatedData, n: usize) -> Vec<u8> {
+        let mut hasher = Hasher::new();
+        for v in [
+            &data.self_custody_public_key,
+            &data.identity_commitment,
+            &data.os,
+            &data.os_version,
+        ] {
+            let len = u32::try_from(v.len()).unwrap();
+            hasher.update(&len.to_le_bytes());
+            hasher.update(v.as_bytes());
+        }
+        hasher.update(&data.pcp_version.to_le_bytes());
+        hasher.update(&data.version.to_le_bytes());
+        finish(hasher, n)
+    }
+
     fn current_hash(data: &AppAuthenticatedData, n: usize) -> Vec<u8> {
         let mut hasher = Hasher::new();
         for v in [
@@ -187,6 +242,7 @@ mod tests {
             &data.identity_commitment,
             &data.os,
             &data.os_version,
+            &data.sub,
         ] {
             let len = u32::try_from(v.len()).unwrap();
             hasher.update(&len.to_le_bytes());
@@ -231,6 +287,24 @@ mod tests {
 
         assert!(legacy_data.verify(&hash));
         assert!(!versioned_data.verify(hash));
+    }
+
+    #[test]
+    fn verify_accepts_v1_hash_only_when_version_is_one() {
+        let v1_data = app_data(1);
+        let mut v2_data = v1_data.clone();
+        v2_data.version = AppAuthenticatedData::VERSION;
+        let hash = v1_hash(&v1_data, 16);
+
+        assert!(v1_data.verify(&hash));
+        assert!(!v2_data.verify(hash));
+    }
+
+    #[test]
+    fn v1_and_current_hashes_differ() {
+        let v1_data = app_data(1);
+        let v2_data = app_data(AppAuthenticatedData::VERSION);
+        assert_ne!(v1_hash(&v1_data, 16), current_hash(&v2_data, 16));
     }
 
     #[test]
