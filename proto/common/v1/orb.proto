@@ -78,6 +78,9 @@ message AppAuthenticatedData {
   string os_version = 4;
   uint32 pcp_version = 5;
   uint32 version = 6;
+  // JWT-standard subject claim (RFC 7519). In World ID 4.0 this is the
+  // canonical name for H(blindingFactor, leafIndex) and matches the `sub`
+  // field in the issued credential (see `Credential::compute_sub`).
   string sub = 7;
 }
 
