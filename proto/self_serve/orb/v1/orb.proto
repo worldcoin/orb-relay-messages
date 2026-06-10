@@ -43,10 +43,9 @@ message CaptureTriggerTimeout {}
 message CaptureEnded {
   enum FailureFeedbackType {
     FAILURE_FEEDBACK_TYPE_UNSPECIFIED = 0;
-    // Deprecated: split into FACE_OCCLUSION, LIGHTING_TOO_DARK, and
-    // LIGHTING_TOO_BRIGHT. Kept for clients that have not yet adopted the
-    // split; the orb no longer emits it.
-    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION_OR_POOR_LIGHTING = 1 [deprecated = true];
+    // To be deprecated: split into FACE_OCCLUSION, LIGHTING_TOO_DARK, and
+    // LIGHTING_TOO_BRIGHT. Kept until clients adopt the split.
+    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
     FAILURE_FEEDBACK_TYPE_TOO_FAR = 2;
     FAILURE_FEEDBACK_TYPE_TOO_CLOSE = 3;
     FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 4;
