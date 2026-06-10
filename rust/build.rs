@@ -14,6 +14,16 @@ fn main() {
         .enum_attribute(
             ".self_serve.app.v1.AbortSignup.Reason",
             "#[derive(serde::Serialize, schemars::JsonSchema)]",
+        )
+        .enum_attribute(
+            ".self_serve.orb.v1.CaptureEnded.FailureFeedbackType",
+            "#[derive(serde::Serialize, schemars::JsonSchema)]\n\
+             #[schemars(rename = \"CaptureFailureFeedbackType\")]",
+        )
+        .enum_attribute(
+            ".self_serve.orb.v1.SignupEnded.FailureFeedbackType",
+            "#[derive(serde::Serialize, schemars::JsonSchema)]\n\
+             #[schemars(rename = \"SignupFailureFeedbackType\")]",
         );
     tonic_prost_build::configure()
         .build_client(cfg!(feature = "client"))
