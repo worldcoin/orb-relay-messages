@@ -43,12 +43,23 @@ message CaptureTriggerTimeout {}
 message CaptureEnded {
   enum FailureFeedbackType {
     FAILURE_FEEDBACK_TYPE_UNSPECIFIED = 0;
-    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION_OR_POOR_LIGHTING = 1;
+    // Deprecated: split into FACE_OCCLUSION, LIGHTING_TOO_DARK, and
+    // LIGHTING_TOO_BRIGHT. Kept for clients that have not yet adopted the
+    // split; the orb no longer emits it.
+    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION_OR_POOR_LIGHTING = 1 [deprecated = true];
     FAILURE_FEEDBACK_TYPE_TOO_FAR = 2;
     FAILURE_FEEDBACK_TYPE_TOO_CLOSE = 3;
     FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 4;
     FAILURE_FEEDBACK_TYPE_USER_ABORT = 5;
     FAILURE_FEEDBACK_TYPE_FACE_NOT_SEEN = 6;
+    FAILURE_FEEDBACK_TYPE_TOO_HIGH = 7;
+    FAILURE_FEEDBACK_TYPE_TOO_LOW = 8;
+    FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION = 9;
+    FAILURE_FEEDBACK_TYPE_LIGHTING_TOO_DARK = 10;
+    FAILURE_FEEDBACK_TYPE_LIGHTING_TOO_BRIGHT = 11;
+    // Orb-side failure (hardware/network), not the user's fault. Apps render a
+    // dedicated orb-error screen rather than the generic failure screen.
+    FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 12;
   }
 
   bool success = 1;
@@ -79,6 +90,9 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_PUPIL2_IRIS_OFFCENTER = 19;
     FAILURE_FEEDBACK_TYPE_IRIS_NOT_CENTERED = 20;
     FAILURE_FEEDBACK_TYPE_PCP_UPLOAD_FAILED = 21;
+    // Orb-side failure (hardware/network), not the user's fault. Apps render a
+    // dedicated orb-error screen rather than the generic failure screen.
+    FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 22;
   }
 
   bool success = 1;
