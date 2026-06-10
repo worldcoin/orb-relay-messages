@@ -88,6 +88,7 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_PUPIL2_IRIS_CONSTRICTION = 18;
     FAILURE_FEEDBACK_TYPE_PUPIL2_IRIS_OFFCENTER = 19;
     FAILURE_FEEDBACK_TYPE_IRIS_NOT_CENTERED = 20;
+    // Upload / orb-side failures
     FAILURE_FEEDBACK_TYPE_PCP_UPLOAD_FAILED = 21;
     // Orb-side failure (hardware/network), not the user's fault. Apps render a
     // dedicated orb-error screen rather than the generic failure screen.
