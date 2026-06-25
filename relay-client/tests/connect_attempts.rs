@@ -1,6 +1,8 @@
 /*
 * tests RelayClient attempts to connect over and over again until it reaches maximum determined number of attempts
 */
+#![cfg(feature = "dangerously-allow-http")]
+
 use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,

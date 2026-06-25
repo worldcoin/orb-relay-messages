@@ -1,6 +1,8 @@
 /*
 * Tests whether a client A can ask a message from client B
 */
+#![cfg(feature = "dangerously-allow-http")]
+
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::{
     prost_types::Any,

@@ -16,6 +16,7 @@ pub use amount::Amount;
 mod actor;
 mod amount;
 mod flume_receiver_stream;
+mod tls;
 
 pub type ClientId = String;
 pub type Seq = u64;
@@ -189,7 +190,7 @@ pub enum Err {
 ///     .entity_type(EntityType::Device)
 ///     .id("device_1")
 ///     .namespace("default")
-///     .endpoint("http://localhost:8080")
+///     .endpoint("https://relay.example.com")
 ///     .auth(Auth::Token("token123".into()))
 ///     .build();
 ///
@@ -213,7 +214,7 @@ pub struct Client {
 ///     .entity_type(EntityType::Orb)
 ///     .id("device_1")
 ///     .namespace("default")
-///     .endpoint("http://localhost:8080")
+///     .endpoint("https://relay.example.com")
 ///     .auth(Auth::Token("token123".to_string()))
 ///     // Optional fields (defaults provided):
 ///     .connection_timeout(Duration::from_secs(30))
@@ -270,7 +271,7 @@ impl Client {
     ///     .entity_type(EntityType::Orb)
     ///     .id("device_1")
     ///     .namespace("default")
-    ///     .endpoint("http://localhost:8080")
+    ///     .endpoint("https://relay.example.com")
     ///     .auth(Auth::Token("token123".to_string()))
     ///     .build();
     ///

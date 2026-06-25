@@ -9,12 +9,17 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+# Disables the HTTPS-only restriction. Only intended for local test servers.
+dangerously-allow-http = []
+
 [dependencies]
+orb-security-utils.workspace = true
 orb-relay-messages = { workspace = true, features = ["client"] }
 orb-relay-test-utils = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util.workspace = true
-tonic = { workspace = true, features = ["tls-native-roots"] }
+tonic = { workspace = true, features = ["tls-ring"] }
 derive_more.workspace = true
 color-eyre.workspace = true
 tokio-stream.workspace = true
@@ -22,6 +27,7 @@ tracing.workspace = true
 flume.workspace = true
 bon.workspace = true
 secrecy.workspace = true
+http.workspace = true
 
 [dev-dependencies]
 async-stream.workspace = true
