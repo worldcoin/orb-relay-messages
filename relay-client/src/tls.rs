@@ -1,4 +1,4 @@
-use orb_security_utils::reqwest::{
+use orb_security_utils::certs::{
     AWS_ROOT_CA1_CERT, AWS_ROOT_CA2_CERT, AWS_ROOT_CA3_CERT, AWS_ROOT_CA4_CERT,
     GTS_ROOT_R1_CERT, GTS_ROOT_R2_CERT, GTS_ROOT_R3_CERT, GTS_ROOT_R4_CERT,
     SFS_ROOT_G2_CERT,
