@@ -78,6 +78,10 @@ message AppAuthenticatedData {
   string os_version = 4;
   uint32 pcp_version = 5;
   uint32 version = 6;
+  // Attested device public key: the `cnf.jwk` confirmation claim (RFC 7800)
+  // from the integrity token, hardware-backed and rotated per `aud`. The orb
+  // seals it into the PCP so only this device can download and consume it.
+  string device_public_key = 7;
 }
 
 message AnnounceAppId {
