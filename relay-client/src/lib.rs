@@ -256,6 +256,10 @@ pub struct ClientOpts {
     keep_alive_interval: Duration,
     #[builder(default = Duration::from_secs(10))]
     keep_alive_timeout: Duration,
+
+    /// Additional root CA (PEM) trusted alongside the pinned production roots.
+    /// Intended for tests against a local TLS server.
+    additional_root_ca: Option<String>,
 }
 
 impl Client {

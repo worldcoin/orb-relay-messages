@@ -9,10 +9,6 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
-[features]
-# Disables the HTTPS-only restriction. Only intended for local test servers.
-dangerously-allow-http = []
-
 [dependencies]
 orb-security-utils.workspace = true
 orb-relay-messages = { workspace = true, features = ["client"] }

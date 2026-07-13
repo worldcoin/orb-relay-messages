@@ -21,36 +21,12 @@ use tracing::{debug, error, info, warn};
 const X_CLIENT_ID_HEADER: &str = "x-client-id";
 const X_DEVICE_TYPE_HEADER: &str = "x-device-type";
 
-#[derive(Debug)]
-enum EndpointScheme {
-    #[cfg(feature = "dangerously-allow-http")]
-    Http,
-    Https(String),
-}
-
-fn endpoint_scheme(endpoint: &str) -> color_eyre::Result<EndpointScheme> {
+fn validate_endpoint(endpoint: &str) -> color_eyre::Result<()> {
     let uri: Uri = endpoint.parse().wrap_err("invalid relay endpoint URI")?;
-    let host = uri
-        .host()
-        .ok_or_else(|| eyre!("relay endpoint URI is missing a host"))?
-        .to_owned();
 
     match uri.scheme_str() {
-        Some("https") => Ok(EndpointScheme::Https(host)),
-        Some("http") => {
-            #[cfg(feature = "dangerously-allow-http")]
-            {
-                Ok(EndpointScheme::Http)
-            }
-
-            #[cfg(not(feature = "dangerously-allow-http"))]
-            {
-                Err(eyre!(
-                    "HTTP relay endpoints are disabled; rebuild orb-relay-client with the `dangerously-allow-http` feature to use local test servers"
-                ))
-            }
-        }
-        Some(other) => Err(eyre!("unsupported relay endpoint scheme `{other}`")),
+        Some("https") => Ok(()),
+        Some(other) => Err(eyre!("relay endpoint must use https, got {other}")),
         None => Err(eyre!("relay endpoint URI is missing a scheme")),
     }
 }
@@ -111,6 +87,7 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
 
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
+        validate_endpoint(&props.opts.endpoint)?;
         let mut state = State::default();
         let mut conn_attempts = 1_u64;
 
@@ -434,18 +411,11 @@ async fn connect(
         ..
     } = opts;
 
-    let mut endpoint = Endpoint::from_shared(domain.clone())?
+    let endpoint = Endpoint::from_shared(domain.clone())?
         .keep_alive_while_idle(true)
         .http2_keep_alive_interval(*keep_alive_interval)
-        .keep_alive_timeout(*keep_alive_timeout);
-
-    match endpoint_scheme(domain)? {
-        EndpointScheme::Https(host) => {
-            endpoint = endpoint.tls_config(tls::client_tls_config(&host))?;
-        }
-        #[cfg(feature = "dangerously-allow-http")]
-        EndpointScheme::Http => {}
-    }
+        .keep_alive_timeout(*keep_alive_timeout)
+        .tls_config(tls::client_tls_config(opts.additional_root_ca.as_deref()))?;
 
     let channel = endpoint.connect().await?;
 
@@ -526,32 +496,16 @@ async fn connect(
 
 #[cfg(test)]
 mod tests {
-    use super::{endpoint_scheme, EndpointScheme};
+    use super::validate_endpoint;
 
     #[test]
     fn https_endpoint_is_accepted() {
-        match endpoint_scheme("https://relay.example.com").unwrap() {
-            EndpointScheme::Https(host) => assert_eq!(host, "relay.example.com"),
-            #[cfg(feature = "dangerously-allow-http")]
-            EndpointScheme::Http => panic!("expected https endpoint"),
-        }
+        validate_endpoint("https://relay.example.com").unwrap();
     }
 
-    #[cfg(not(feature = "dangerously-allow-http"))]
     #[test]
-    fn http_endpoint_is_rejected_without_feature() {
-        let err = endpoint_scheme("http://127.0.0.1:8080").unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("HTTP relay endpoints are disabled"));
-    }
-
-    #[cfg(feature = "dangerously-allow-http")]
-    #[test]
-    fn http_endpoint_is_allowed_with_feature() {
-        assert!(matches!(
-            endpoint_scheme("http://127.0.0.1:8080").unwrap(),
-            EndpointScheme::Http
-        ));
+    fn http_endpoint_is_rejected() {
+        let err = validate_endpoint("http://127.0.0.1:8080").unwrap_err();
+        assert!(err.to_string().contains("must use https"));
     }
 }

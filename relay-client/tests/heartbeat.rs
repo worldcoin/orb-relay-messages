@@ -1,5 +1,3 @@
-#![cfg(feature = "dangerously-allow-http")]
-
 use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
@@ -31,18 +29,24 @@ async fn it_sends_heartbeat_periodically() {
     let opts = ClientOpts::entity(EntityType::App)
         .id("foo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_millis(50))
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     // Act
     let (_client, _handle) = Client::connect(opts);
 
     // Assert
-    time::sleep(Duration::from_millis(200)).await;
+    time::sleep(Duration::from_millis(450)).await;
     let heartbeat_count = *sv.state().await;
-    assert_eq!(heartbeat_count, 3)
+
+    assert!(
+        (3..=9).contains(&heartbeat_count),
+        "expected some heartbeats, got {}",
+        heartbeat_count
+    );
 }

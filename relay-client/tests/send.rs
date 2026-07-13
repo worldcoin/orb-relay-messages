@@ -1,7 +1,6 @@
 /*
 * Tests whether a client A can send a message to client B
 */
-#![cfg(feature = "dangerously-allow-http")]
 
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::{
@@ -36,12 +35,13 @@ async fn sends_at_most_once_and_increases_seq() {
     let opts = ClientOpts::entity(EntityType::App)
         .id("foo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);
@@ -135,12 +135,13 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
     let opts = ClientOpts::entity(EntityType::App)
         .id("foo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(10))
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);
