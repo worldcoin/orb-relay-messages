@@ -39,3 +39,5 @@ tracing = "0.1"
 bon = "3.8.1"
 secrecy = "0.10.3"
 pollster = "0.4.0"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+rustls-pki-types = { version = "1.1.14"}

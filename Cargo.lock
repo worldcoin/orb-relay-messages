@@ -836,6 +836,8 @@ dependencies = [
  "orb-relay-messages",
  "orb-relay-test-utils",
  "orb-security-utils",
+ "rustls",
+ "rustls-pki-types",
  "secrecy",
  "tokio",
  "tokio-stream",

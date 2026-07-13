@@ -28,3 +28,5 @@ http.workspace = true
 [dev-dependencies]
 async-stream.workspace = true
 orb-relay-messages = { workspace = true, features = ["client", "server"] }
+rustls.workspace = true
+rustls-pki-types.workspace = true
