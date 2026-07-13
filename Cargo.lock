@@ -865,7 +865,7 @@ dependencies = [
 [[package]]
 name = "orb-security-utils"
 version = "0.0.0"
-source = "git+https://github.com/worldcoin/orb-software.git?rev=2e204bfb5a42b335f7f6208b95e2e401968c07bc#2e204bfb5a42b335f7f6208b95e2e401968c07bc"
+source = "git+https://github.com/worldcoin/orb-software.git?rev=188054122007ba8528413519e4335f45d781e75b#188054122007ba8528413519e4335f45d781e75b"
 dependencies = [
  "eyre",
  "hex-literal",
