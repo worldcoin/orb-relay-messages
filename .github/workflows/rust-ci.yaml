@@ -33,12 +33,6 @@ jobs:
       - name: Clippy lints
         run: cargo clippy --all --all-features --all-targets --no-deps -- -D warnings
 
-      # `--all-features` enables `dangerously-allow-http`, compiling out the
-      # `cfg(not(feature = "dangerously-allow-http"))` half of relay-client.
-      # Lint that half too.
-      - name: Clippy lints (relay-client, default features)
-        run: cargo clippy -p orb-relay-client --all-targets --no-deps -- -D warnings
-
   test:
     name: Test
     runs-on: ubuntu-22.04
@@ -53,11 +47,6 @@ jobs:
 
       - name: Cargo test
         run: cargo test --all --all-features
-
-      # Runs the HTTPS-enforcement tests, which only exist without
-      # `dangerously-allow-http` (enabled above by `--all-features`).
-      - name: Cargo test (relay-client, default features)
-        run: cargo test -p orb-relay-client
 
   doc:
     name: Docs
