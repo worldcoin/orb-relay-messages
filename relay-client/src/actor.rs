@@ -2,8 +2,8 @@ use crate::{
     flume_receiver_stream, relay_payload, tls, Amount, Auth, ClientId, ClientOpts, Err,
     QoS, RecvdRelayPayload, SendMessage, Seq,
 };
-use color_eyre::eyre::{eyre, Context};
-use http::Uri;
+use color_eyre::eyre::{ensure, eyre, Context};
+use http::{uri::Scheme, Uri};
 use orb_relay_messages::relay::{
     connect_request::AuthMethod, entity::EntityType, relay_connect_request,
     relay_connect_response, relay_service_client::RelayServiceClient, Ack,
@@ -23,12 +23,11 @@ const X_DEVICE_TYPE_HEADER: &str = "x-device-type";
 
 fn validate_endpoint(endpoint: &str) -> color_eyre::Result<()> {
     let uri: Uri = endpoint.parse().wrap_err("invalid relay endpoint URI")?;
-
-    match uri.scheme_str() {
-        Some("https") => Ok(()),
-        Some(other) => Err(eyre!("relay endpoint must use https, got {other}")),
-        None => Err(eyre!("relay endpoint URI is missing a scheme")),
-    }
+    ensure!(
+        uri.scheme() == Some(&Scheme::HTTPS),
+        "relay endpoint must use https: `{endpoint}`"
+    );
+    Ok(())
 }
 
 #[derive(Default)]

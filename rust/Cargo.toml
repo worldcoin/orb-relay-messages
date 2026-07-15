@@ -7,7 +7,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [features]
-client = []
+client = ["tonic/tls-ring"]
 server = []
 
 [dependencies]
