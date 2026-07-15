@@ -31,23 +31,25 @@ async fn sends_and_replies_to_message() {
     let opts_foo = ClientOpts::entity(EntityType::App)
         .id("foo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let opts_boo = ClientOpts::entity(EntityType::App)
         .id("boo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client_foo, _) = Client::connect(opts_foo);

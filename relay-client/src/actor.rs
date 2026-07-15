@@ -1,8 +1,9 @@
 use crate::{
-    flume_receiver_stream, relay_payload, Amount, Auth, ClientId, ClientOpts, Err, QoS,
-    RecvdRelayPayload, SendMessage, Seq,
+    flume_receiver_stream, relay_payload, tls, Amount, Auth, ClientId, ClientOpts, Err,
+    QoS, RecvdRelayPayload, SendMessage, Seq,
 };
-use color_eyre::eyre::{eyre, Context};
+use color_eyre::eyre::{ensure, eyre, Context};
+use http::{uri::Scheme, Uri};
 use orb_relay_messages::relay::{
     connect_request::AuthMethod, entity::EntityType, relay_connect_request,
     relay_connect_response, relay_service_client::RelayServiceClient, Ack,
@@ -14,15 +15,20 @@ use std::collections::HashMap;
 use tokio::{task, time};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
-use tonic::{
-    metadata::MetadataValue,
-    transport::{ClientTlsConfig, Endpoint},
-    Request, Streaming,
-};
+use tonic::{metadata::MetadataValue, transport::Endpoint, Request, Streaming};
 use tracing::{debug, error, info, warn};
 
 const X_CLIENT_ID_HEADER: &str = "x-client-id";
 const X_DEVICE_TYPE_HEADER: &str = "x-device-type";
+
+fn validate_endpoint(endpoint: &str) -> color_eyre::Result<()> {
+    let uri: Uri = endpoint.parse().wrap_err("invalid relay endpoint URI")?;
+    ensure!(
+        uri.scheme() == Some(&Scheme::HTTPS),
+        "relay endpoint must use https: `{endpoint}`"
+    );
+    Ok(())
+}
 
 #[derive(Default)]
 pub struct State {
@@ -80,6 +86,7 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
 
     let relay_actor_tx_clone = relay_actor_tx.clone();
     let join_handle = task::spawn(async move {
+        validate_endpoint(&props.opts.endpoint)?;
         let mut state = State::default();
         let mut conn_attempts = 1_u64;
 
@@ -403,15 +410,11 @@ async fn connect(
         ..
     } = opts;
 
-    let mut endpoint = Endpoint::from_shared(domain.clone())?
+    let endpoint = Endpoint::from_shared(domain.clone())?
         .keep_alive_while_idle(true)
         .http2_keep_alive_interval(*keep_alive_interval)
-        .keep_alive_timeout(*keep_alive_timeout);
-
-    if domain.starts_with("https://") {
-        let tls_config = ClientTlsConfig::new().with_native_roots();
-        endpoint = endpoint.tls_config(tls_config)?;
-    }
+        .keep_alive_timeout(*keep_alive_timeout)
+        .tls_config(tls::client_tls_config(opts.additional_root_ca.as_deref()))?;
 
     let channel = endpoint.connect().await?;
 
@@ -488,4 +491,20 @@ async fn connect(
     }
 
     Ok(response_stream)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_endpoint;
+
+    #[test]
+    fn https_endpoint_is_accepted() {
+        validate_endpoint("https://relay.example.com").unwrap();
+    }
+
+    #[test]
+    fn http_endpoint_is_rejected() {
+        let err = validate_endpoint("http://127.0.0.1:8080").unwrap_err();
+        assert!(err.to_string().contains("must use https"));
+    }
 }

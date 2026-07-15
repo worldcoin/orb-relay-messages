@@ -12,7 +12,12 @@ use tokio::{
     task,
 };
 use tokio_stream::{wrappers::TcpListenerStream, Stream};
-use tonic::{transport::Server, Request, Response, Status, Streaming};
+use tonic::{
+    transport::{Identity, Server, ServerTlsConfig},
+    Request, Response, Status, Streaming,
+};
+
+use rcgen::{BasicConstraints, CertificateParams, IsCa, KeyPair};
 
 type OutboundMessageStream =
     Pin<Box<dyn Stream<Item = Result<RelayConnectResponse, Status>> + Send>>;
@@ -79,6 +84,35 @@ enum Cmd {
 
 fn entity_key(e: &Entity) -> String {
     format!("{}{}{}", e.id, e.namespace, e.entity_type)
+}
+
+struct TlsMaterial {
+    ca_cert_pem: String,
+    identity: Identity,
+}
+
+impl TlsMaterial {
+    fn new() -> Self {
+        let ca_key = KeyPair::generate().unwrap();
+        let mut ca_params = CertificateParams::new(Vec::new()).unwrap();
+        ca_params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
+        let ca_cert = ca_params.self_signed(&ca_key).unwrap();
+
+        let server_key = KeyPair::generate().unwrap();
+
+        let server_cert = CertificateParams::new(vec![
+            "localhost".to_string(),
+            "127.0.0.1".to_string(),
+        ])
+        .unwrap()
+        .signed_by(&server_key, &ca_cert, &ca_key)
+        .unwrap();
+
+        Self {
+            ca_cert_pem: ca_cert.pem(),
+            identity: Identity::from_pem(server_cert.pem(), server_key.serialize_pem()),
+        }
+    }
 }
 
 #[tonic::async_trait]
@@ -149,6 +183,7 @@ where
 /// separate tokio task and will be shut down when this struct is dropped.
 pub struct TestServer<S> {
     addr: SocketAddr,
+    ca_cert_pem: String,
     state: Arc<Mutex<S>>,
     shutdown: flume::Sender<()>,
 }
@@ -211,8 +246,12 @@ where
         let (tx, rx) = flume::bounded(1);
 
         let state = Arc::new(Mutex::new(state));
+
+        let tls = TlsMaterial::new();
         tokio::spawn(
             Server::builder()
+                .tls_config(ServerTlsConfig::new().identity(tls.identity))
+                .unwrap()
                 .add_service(RelayServiceServer::new(RelayServiceHandler {
                     state: state.clone(),
                     clients: ConnectedClients::default(),
@@ -228,6 +267,7 @@ where
 
         TestServer {
             addr,
+            ca_cert_pem: tls.ca_cert_pem,
             shutdown: tx,
             state,
         }
@@ -238,7 +278,10 @@ where
         self.addr
     }
 
-    #[allow(dead_code)] // this is not dead code why do i need this
+    pub fn ca_cert_pem(&self) -> &str {
+        &self.ca_cert_pem
+    }
+
     /// Returns a mutex guard that can be used to access and modify the server's state
     pub async fn state(&self) -> MutexGuard<'_, S> {
         self.state.lock().await

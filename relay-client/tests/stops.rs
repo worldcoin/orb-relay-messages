@@ -30,10 +30,11 @@ async fn it_stops_sever_when_stop_is_called() {
     let opts = ClientOpts::entity(EntityType::App)
         .id("foo")
         .namespace("bar")
-        .endpoint(format!("http://{}", sv.addr()))
+        .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .connection_timeout(Duration::from_millis(10))
+        .connection_timeout(Duration::from_secs(5))
+        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     // Act
