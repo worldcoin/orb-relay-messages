@@ -869,6 +869,7 @@ version = "0.0.1"
 dependencies = [
  "async-stream",
  "flume",
+ "lazy_static",
  "orb-relay-messages",
  "pollster",
  "rcgen",

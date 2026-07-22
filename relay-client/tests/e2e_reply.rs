@@ -1,3 +1,4 @@
+#![cfg(feature = "testing")]
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
@@ -37,7 +38,6 @@ async fn sends_and_replies_to_message() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let opts_boo = ClientOpts::entity(EntityType::App)
@@ -49,7 +49,6 @@ async fn sends_and_replies_to_message() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client_foo, _) = Client::connect(opts_foo);

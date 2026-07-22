@@ -1,3 +1,4 @@
+#![cfg(feature = "testing")]
 /*
 * Tests whether a client A can send a message to client B
 */
@@ -41,7 +42,6 @@ async fn sends_at_most_once_and_increases_seq() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);
@@ -141,7 +141,6 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .ack_timeout(Duration::from_millis(10))
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);

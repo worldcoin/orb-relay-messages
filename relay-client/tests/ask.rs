@@ -2,6 +2,7 @@
 * Tests whether a client A can ask a message from client B
 */
 
+#![cfg(feature = "testing")]
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
 use orb_relay_messages::{
     prost_types::Any,
@@ -54,7 +55,6 @@ async fn asks_at_most_once() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .reply_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);
@@ -141,7 +141,6 @@ async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .reply_timeout(Duration::from_millis(10))
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);
@@ -225,7 +224,6 @@ async fn ask_increases_seq() {
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_secs(u64::MAX))
         .reply_timeout(Duration::from_millis(1)) // so we can test that we aren't retrying when QoS is AtMostOnce
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     let (client, _handle) = Client::connect(opts);

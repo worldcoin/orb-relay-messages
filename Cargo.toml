@@ -23,7 +23,7 @@ http = "1"
 prost = "0.14.1"
 prost-build = "0.14.1"
 prost-types = "0.14.1"
-rcgen =  "0.13"
+rcgen = "0.13"
 tonic = "0.14.2"
 tonic-prost = "0.14.2"
 tonic-build = "0.14.2"
@@ -40,4 +40,4 @@ bon = "3.8.1"
 secrecy = "0.10.3"
 pollster = "0.4.0"
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
-rustls-pki-types = { version = "1.1.14"}
+rustls-pki-types = { version = "1.1.14" }
