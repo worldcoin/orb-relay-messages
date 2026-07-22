@@ -1,3 +1,4 @@
+#![cfg(feature = "testing")]
 use orb_relay_client::{Amount, Auth, Client, ClientOpts};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
@@ -34,7 +35,6 @@ async fn it_sends_heartbeat_periodically() {
         .max_connection_attempts(Amount::Val(1))
         .connection_timeout(Duration::from_secs(5))
         .heartbeat(Duration::from_millis(50))
-        .additional_root_ca(sv.ca_cert_pem())
         .build();
 
     // Act

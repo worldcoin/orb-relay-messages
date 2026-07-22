@@ -414,7 +414,7 @@ async fn connect(
         .keep_alive_while_idle(true)
         .http2_keep_alive_interval(*keep_alive_interval)
         .keep_alive_timeout(*keep_alive_timeout)
-        .tls_config(tls::client_tls_config(opts.additional_root_ca.as_deref()))?;
+        .tls_config(tls::client_tls_config())?;
 
     let channel = endpoint.connect().await?;
 

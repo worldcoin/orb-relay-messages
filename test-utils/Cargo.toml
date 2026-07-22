@@ -14,8 +14,9 @@ orb-relay-messages = { workspace = true, features = ["client", "server"] }
 
 async-stream.workspace = true
 tokio = { workspace = true, features = ["full"] }
-tonic = {workspace = true, features = ["tls-ring"]}
+tonic = { workspace = true, features = ["tls-ring"] }
 rcgen.workspace = true
 tokio-stream.workspace = true
 flume.workspace = true
 pollster.workspace = true
+lazy_static = "1.5.0"

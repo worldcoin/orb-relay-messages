@@ -1,3 +1,5 @@
+use lazy_static::lazy_static;
+
 use orb_relay_messages::relay::{
     relay_connect_request,
     relay_connect_response::{self, Msg},
@@ -13,7 +15,7 @@ use tokio::{
 };
 use tokio_stream::{wrappers::TcpListenerStream, Stream};
 use tonic::{
-    transport::{Identity, Server, ServerTlsConfig},
+    transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status, Streaming,
 };
 
@@ -87,7 +89,7 @@ fn entity_key(e: &Entity) -> String {
 }
 
 struct TlsMaterial {
-    ca_cert_pem: String,
+    ca_certificate: Certificate,
     identity: Identity,
 }
 
@@ -109,10 +111,18 @@ impl TlsMaterial {
         .unwrap();
 
         Self {
-            ca_cert_pem: ca_cert.pem(),
+            ca_certificate: Certificate::from_pem(ca_cert.pem()),
             identity: Identity::from_pem(server_cert.pem(), server_key.serialize_pem()),
         }
     }
+}
+
+lazy_static! {
+    static ref TLS_MATERIAL: TlsMaterial = TlsMaterial::new();
+}
+
+pub fn ca_certificate() -> Certificate {
+    TLS_MATERIAL.ca_certificate.clone()
 }
 
 #[tonic::async_trait]
@@ -183,7 +193,6 @@ where
 /// separate tokio task and will be shut down when this struct is dropped.
 pub struct TestServer<S> {
     addr: SocketAddr,
-    ca_cert_pem: String,
     state: Arc<Mutex<S>>,
     shutdown: flume::Sender<()>,
 }
@@ -247,10 +256,11 @@ where
 
         let state = Arc::new(Mutex::new(state));
 
-        let tls = TlsMaterial::new();
         tokio::spawn(
             Server::builder()
-                .tls_config(ServerTlsConfig::new().identity(tls.identity))
+                .tls_config(
+                    ServerTlsConfig::new().identity(TLS_MATERIAL.identity.clone()),
+                )
                 .unwrap()
                 .add_service(RelayServiceServer::new(RelayServiceHandler {
                     state: state.clone(),
@@ -267,7 +277,6 @@ where
 
         TestServer {
             addr,
-            ca_cert_pem: tls.ca_cert_pem,
             shutdown: tx,
             state,
         }
@@ -276,10 +285,6 @@ where
     /// Gets the server's random TCP socket address
     pub fn addr(&self) -> SocketAddr {
         self.addr
-    }
-
-    pub fn ca_cert_pem(&self) -> &str {
-        &self.ca_cert_pem
     }
 
     /// Returns a mutex guard that can be used to access and modify the server's state

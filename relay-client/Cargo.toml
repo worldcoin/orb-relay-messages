@@ -9,10 +9,12 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 
+[features]
+testing = ["dep:orb-relay-test-utils"]
+
 [dependencies]
 orb-security-utils.workspace = true
 orb-relay-messages = { workspace = true, features = ["client"] }
-orb-relay-test-utils = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-util.workspace = true
 tonic = { workspace = true, features = ["tls-ring"] }
@@ -24,6 +26,7 @@ flume.workspace = true
 bon.workspace = true
 secrecy.workspace = true
 http.workspace = true
+orb-relay-test-utils = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-stream.workspace = true

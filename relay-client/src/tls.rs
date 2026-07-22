@@ -1,13 +1,28 @@
+#[cfg(not(feature = "testing"))]
 use orb_security_utils::certs::all_pem_certs;
-use tonic::transport::{Certificate, ClientTlsConfig};
 
-pub fn client_tls_config(additional_root_ca: Option<&str>) -> ClientTlsConfig {
-    all_pem_certs()
-        .into_iter()
-        .chain(additional_root_ca.map(str::as_bytes))
-        .fold(ClientTlsConfig::new(), |config, cert_pem| {
-            config.ca_certificate(Certificate::from_pem(cert_pem))
-        })
+use tonic::transport::ClientTlsConfig;
+
+#[cfg(not(feature = "testing"))]
+use tonic::transport::Certificate;
+
+#[cfg(feature = "testing")]
+use orb_relay_test_utils::ca_certificate;
+
+pub fn client_tls_config() -> ClientTlsConfig {
+    #[cfg(not(feature = "testing"))]
+    {
+        all_pem_certs()
+            .into_iter()
+            .fold(ClientTlsConfig::new(), |config, cert_pem| {
+                config.ca_certificate(Certificate::from_pem(cert_pem))
+            })
+    }
+
+    #[cfg(feature = "testing")]
+    {
+        ClientTlsConfig::new().ca_certificate(ca_certificate())
+    }
 }
 
 #[cfg(test)]
