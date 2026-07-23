@@ -59,6 +59,7 @@ message CaptureEnded {
     // Orb-side failure (hardware/network), not the user's fault. Apps render a
     // dedicated orb-error screen rather than the generic failure screen.
     FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 12;
+    FAILURE_FEEDBACK_TYPE_MULTIPLE_FACES = 13;
   }
 
   bool success = 1;
