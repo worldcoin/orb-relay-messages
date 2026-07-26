@@ -76,6 +76,10 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 6;
     FAILURE_FEEDBACK_TYPE_HEAD_POSE = 7;
     FAILURE_FEEDBACK_TYPE_UNDERAGED = 8;
+    // The backend failed (cloud services), as opposed to ORB_INTERNAL_ERROR,
+    // which is this orb failing (hardware, outdated OS, on-device crash). Apps
+    // show the same orb-error screen for both; the split keeps the analytics
+    // signals honest: a SERVER_ERROR spike means "backend incident".
     FAILURE_FEEDBACK_TYPE_SERVER_ERROR = 9;
     FAILURE_FEEDBACK_TYPE_LOW_IMAGE_QUALITY = 10;
     // IRIS Model errors
