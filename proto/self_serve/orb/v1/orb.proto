@@ -56,8 +56,7 @@ message CaptureEnded {
     FAILURE_FEEDBACK_TYPE_FACE_OCCLUSION = 9;
     FAILURE_FEEDBACK_TYPE_LIGHTING_TOO_DARK = 10;
     FAILURE_FEEDBACK_TYPE_LIGHTING_TOO_BRIGHT = 11;
-    // Orb-side failure (hardware/network), not the user's fault. Apps render a
-    // dedicated orb-error screen rather than the generic failure screen.
+    // This orb failed (hardware, internal error); not the user's fault.
     FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 12;
     FAILURE_FEEDBACK_TYPE_MULTIPLE_FACES = 13;
   }
@@ -76,10 +75,7 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_EYES_OCCLUSION = 6;
     FAILURE_FEEDBACK_TYPE_HEAD_POSE = 7;
     FAILURE_FEEDBACK_TYPE_UNDERAGED = 8;
-    // The backend failed (cloud services), as opposed to ORB_INTERNAL_ERROR,
-    // which is this orb failing (hardware, outdated OS, on-device crash). Apps
-    // show the same orb-error screen for both; the split keeps the analytics
-    // signals honest: a SERVER_ERROR spike means "backend incident".
+    // A backend request failed; not this orb's fault (see ORB_INTERNAL_ERROR).
     FAILURE_FEEDBACK_TYPE_SERVER_ERROR = 9;
     FAILURE_FEEDBACK_TYPE_LOW_IMAGE_QUALITY = 10;
     // IRIS Model errors
@@ -95,8 +91,7 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_IRIS_NOT_CENTERED = 20;
     // Upload / orb-side failures
     FAILURE_FEEDBACK_TYPE_PCP_UPLOAD_FAILED = 21;
-    // Orb-side failure (hardware/network), not the user's fault. Apps render a
-    // dedicated orb-error screen rather than the generic failure screen.
+    // This orb failed (hardware, outdated OS, on-device crash); not the backend, not the user.
     FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 22;
   }
 
