@@ -58,6 +58,14 @@ pub mod common {
                 }
             }
 
+            /// Returns `device_public_key` only when the hash format bound it:
+            /// pre-v2 hashes ignore the field, so a value arriving in a pre-v2
+            /// message passes [`Self::verify`] without being authenticated.
+            pub fn bound_device_public_key(&self) -> Option<&str> {
+                (self.version >= 2 && !self.device_public_key.is_empty())
+                    .then_some(self.device_public_key.as_str())
+            }
+
             /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
             ///
             /// New producers should set `version` to

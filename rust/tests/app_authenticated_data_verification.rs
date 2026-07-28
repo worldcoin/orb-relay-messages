@@ -44,3 +44,14 @@ fn encode_decode_rejects_incorrect_app_data() {
     let incorrect_app_data = make_app_data("0x1234", 2);
     assert!(!incorrect_app_data.verify(parsed_app_data));
 }
+
+#[test]
+fn bound_device_public_key_requires_v2_and_nonempty() {
+    let mut app_data = make_app_data("0xabcd", 3);
+    assert_eq!(app_data.bound_device_public_key(), Some("dpk_abc123"));
+    app_data.version = 1;
+    assert_eq!(app_data.bound_device_public_key(), None);
+    app_data.version = AppAuthenticatedData::VERSION;
+    app_data.device_public_key.clear();
+    assert_eq!(app_data.bound_device_public_key(), None);
+}
