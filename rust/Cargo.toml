@@ -16,6 +16,7 @@ prost.workspace = true
 prost-types.workspace = true
 schemars = "0.8"
 serde = { version = "1", features = ["derive"] }
+thiserror.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
 
