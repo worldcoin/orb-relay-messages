@@ -35,34 +35,66 @@ pub mod common {
         tonic::include_proto!("common.v1");
 
         use blake3::Hasher;
+        use thiserror::Error;
 
         /// Default PCP version value.
         const PCP_VERSION_DEFAULT: u32 = 2;
+
+        /// Why an [`AppAuthenticatedData`] could not be hashed.
+        #[derive(Debug, Clone, PartialEq, Eq, Error)]
+        pub enum HashError {
+            #[error("version {0} is not the current hash format")]
+            WrongVersion(u32),
+            #[error("`device_public_key` must be set")]
+            MissingDevicePublicKey,
+        }
+
+        /// Why an [`AppAuthenticatedData`] did not verify against a hash.
+        #[derive(Debug, Clone, PartialEq, Eq, Error)]
+        pub enum VerifyError {
+            #[error("the hash to verify against is empty")]
+            EmptyHash,
+            #[error("no hash format is defined for version {0}")]
+            UnsupportedVersion(u32),
+            #[error("unexpected `device_public_key` in pre-v2 hash formats")]
+            UnboundDevicePublicKey,
+            #[error(transparent)]
+            Unhashable(#[from] HashError),
+            #[error("the data does not match the hash")]
+            Mismatch,
+        }
 
         impl AppAuthenticatedData {
             /// Current hash format version for new producers.
             pub const VERSION: u32 = 2;
 
-            /// Returns `true` if `hash` matches this [`AppAuthenticatedData`]
-            /// under the format selected by `self.version`.
-            pub fn verify(&self, hash: impl AsRef<[u8]>) -> bool {
+            /// Checks that `hash` matches this [`AppAuthenticatedData`] under
+            /// the format selected by `self.version`.
+            pub fn verify(&self, hash: impl AsRef<[u8]>) -> Result<(), VerifyError> {
                 let external_hash = hash.as_ref();
                 if external_hash.is_empty() {
-                    return false;
+                    return Err(VerifyError::EmptyHash);
                 }
-                match self.version {
-                    Self::VERSION => external_hash == self.hash(external_hash.len()),
-                    1 => external_hash == self.hash_v1(external_hash.len()),
-                    0 => external_hash == self.legacy_hash(external_hash.len()),
-                    _ => false,
+                let computed = match self.version {
+                    Self::VERSION => self.hash(external_hash.len())?,
+                    0 | 1 if !self.device_public_key.is_empty() => {
+                        return Err(VerifyError::UnboundDevicePublicKey)
+                    }
+                    1 => self.hash_v1(external_hash.len()),
+                    0 => self.legacy_hash(external_hash.len()),
+                    version => return Err(VerifyError::UnsupportedVersion(version)),
+                };
+                if external_hash != computed {
+                    return Err(VerifyError::Mismatch);
                 }
+                Ok(())
             }
 
             /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
             ///
-            /// New producers should set `version` to
-            /// [`Self::VERSION`] before serializing app data.
-            pub fn hash(&self, n: usize) -> Vec<u8> {
+            /// New producers should set `version` to [`Self::VERSION`] and
+            /// `device_public_key` before serializing app data.
+            pub fn hash(&self, n: usize) -> Result<Vec<u8>, HashError> {
                 let mut hasher = Hasher::new();
                 let Self {
                     self_custody_public_key,
@@ -73,7 +105,12 @@ pub mod common {
                     version,
                     device_public_key,
                 } = self;
-                assert_eq!(*version, Self::VERSION, "version != Self::VERSION");
+                if *version != Self::VERSION {
+                    return Err(HashError::WrongVersion(*version));
+                }
+                if device_public_key.is_empty() {
+                    return Err(HashError::MissingDevicePublicKey);
+                }
                 for v in [
                     self_custody_public_key,
                     identity_commitment,
@@ -89,7 +126,7 @@ pub mod common {
                 hasher.update(&version.to_le_bytes());
                 let mut output = vec![0; n];
                 hasher.finalize_xof().fill(&mut output);
-                output
+                Ok(output)
             }
 
             /// v1 length-prefixed BLAKE3 hash (no `device_public_key`).
@@ -174,7 +211,7 @@ pub mod jobs {
 
 #[cfg(test)]
 mod tests {
-    use super::common::v1::AppAuthenticatedData;
+    use super::common::v1::{AppAuthenticatedData, HashError, VerifyError};
     use blake3::Hasher;
 
     fn app_data(version: u32) -> AppAuthenticatedData {
@@ -185,7 +222,11 @@ mod tests {
             os_version: "18.0".into(),
             pcp_version: 2,
             version,
-            device_public_key: "dpk_ghi789".into(),
+            device_public_key: if version >= 2 {
+                "dpk_ghi789".into()
+            } else {
+                String::new()
+            },
         }
     }
 
@@ -249,26 +290,33 @@ mod tests {
     #[test]
     fn hash_uses_current_format() {
         let data = app_data(AppAuthenticatedData::VERSION);
-        assert_eq!(data.hash(16), current_hash(&data, 16));
-        assert_ne!(data.hash(16), legacy_hash(&data, 16));
+        assert_eq!(data.hash(16).unwrap(), current_hash(&data, 16));
+        assert_ne!(data.hash(16).unwrap(), legacy_hash(&data, 16));
     }
 
     #[test]
-    #[should_panic]
     fn hash_rejects_missing_version() {
-        app_data(0).hash(16);
+        assert_eq!(app_data(0).hash(16), Err(HashError::WrongVersion(0)));
+    }
+
+    #[test]
+    fn hash_rejects_missing_device_public_key() {
+        let mut data = app_data(AppAuthenticatedData::VERSION);
+        data.device_public_key = String::new();
+
+        assert_eq!(data.hash(16), Err(HashError::MissingDevicePublicKey));
     }
 
     #[test]
     fn verify_accepts_current_hash_and_rejects_bad_hashes() {
         let data = app_data(AppAuthenticatedData::VERSION);
-        let mut hash = data.hash(16);
+        let mut hash = data.hash(16).unwrap();
 
-        assert!(data.verify(&hash));
-        assert!(!data.verify(b""));
+        assert_eq!(data.verify(&hash), Ok(()));
+        assert_eq!(data.verify(b""), Err(VerifyError::EmptyHash));
 
         hash[0] ^= 0xff;
-        assert!(!data.verify(hash));
+        assert_eq!(data.verify(hash), Err(VerifyError::Mismatch));
     }
 
     #[test]
@@ -278,8 +326,8 @@ mod tests {
         versioned_data.version = AppAuthenticatedData::VERSION;
         let hash = legacy_hash(&legacy_data, 16);
 
-        assert!(legacy_data.verify(&hash));
-        assert!(!versioned_data.verify(hash));
+        assert_eq!(legacy_data.verify(&hash), Ok(()));
+        assert!(versioned_data.verify(hash).is_err());
     }
 
     #[test]
@@ -289,8 +337,25 @@ mod tests {
         v2_data.version = AppAuthenticatedData::VERSION;
         let hash = v1_hash(&v1_data, 16);
 
-        assert!(v1_data.verify(&hash));
-        assert!(!v2_data.verify(hash));
+        assert_eq!(v1_data.verify(&hash), Ok(()));
+        assert!(v2_data.verify(hash).is_err());
+    }
+
+    #[test]
+    fn verify_rejects_device_public_key_unbound_by_pre_v2_hashes() {
+        for version in [0, 1] {
+            let mut data = app_data(version);
+            let hash = if version == 1 {
+                v1_hash(&data, 16)
+            } else {
+                legacy_hash(&data, 16)
+            };
+            assert_eq!(data.verify(&hash), Ok(()));
+            data.device_public_key = "dpk_injected".into();
+            // Pre-v2 hashes ignore the field, so the hash still matches;
+            // verify must reject anyway.
+            assert_eq!(data.verify(hash), Err(VerifyError::UnboundDevicePublicKey),);
+        }
     }
 
     #[test]
@@ -304,6 +369,6 @@ mod tests {
         data_b.self_custody_public_key = "cdef".into();
 
         assert_eq!(legacy_hash(&data_a, 16), legacy_hash(&data_b, 16));
-        assert_ne!(data_a.hash(16), data_b.hash(16));
+        assert_ne!(data_a.hash(16).unwrap(), data_b.hash(16).unwrap());
     }
 }
