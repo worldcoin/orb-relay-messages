@@ -59,6 +59,8 @@ message CaptureEnded {
     // This orb failed (hardware, internal error); not the user's fault.
     FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 12;
     FAILURE_FEEDBACK_TYPE_MULTIPLE_FACES = 13;
+    FAILURE_FEEDBACK_TYPE_PUPIL_DILATION = 14;
+    FAILURE_FEEDBACK_TYPE_PUPIL_CONSTRICTION = 15;
   }
 
   bool success = 1;
