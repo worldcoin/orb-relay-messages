@@ -28,6 +28,8 @@ message PairingRequest {
   string app_id = 1;
   bytes user_data_hash = 2;
   string public_key = 3;
+  // Fresh App challenge echoed in AnnounceOrbId for scan-to-pair.
+  bytes request_nonce = 4;
 }
 
 message PcpBlobTransferComplete {
