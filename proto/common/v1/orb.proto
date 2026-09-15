@@ -100,7 +100,6 @@ message AnnounceAppId {
   string bypass_age_verification_token = 5;
   bool is_test = 6;
   P2pNodeInfo p2p_node_info = 7;
-  // iPCP PNG encrypted to AnnounceOrbId.ipcp_encryption_public_key.
   bytes encrypted_ipcp = 8;
   // Echo of AnnounceOrbId.orb_nonce.
   bytes orb_nonce = 10;
