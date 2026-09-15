@@ -98,7 +98,6 @@ message AppAuthenticatedData {
 
 message AnnounceAppId {
   reserved 9;
-  reserved "encrypted_ipcp_hash";
 
   uint64 protocol_version = 1;
   bool heartbeat = 2;
