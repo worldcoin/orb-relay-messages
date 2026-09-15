@@ -26,7 +26,6 @@ fn ipcp_pairing_fields_round_trip() {
         orb_nonce: vec![4, 5, 6],
         integrity_token: "integrity-token".into(),
         integrity_signature: vec![19, 20, 21],
-        integrity_timestamp: 1_725_302_400,
         ..Default::default()
     };
     let pairing_request = PairingRequest {
@@ -84,11 +83,27 @@ fn app_announcement_ignores_removed_hash_field() {
         orb_nonce: vec![4, 5, 6],
         integrity_token: "integrity-token".into(),
         integrity_signature: vec![19, 20, 21],
-        integrity_timestamp: 1_725_302_400,
         ..Default::default()
     };
     let mut legacy_bytes = expected.encode_to_vec();
     legacy_bytes.extend_from_slice(&[0x4a, 0x03, 16, 17, 18]);
+
+    let decoded = AnnounceAppId::decode(legacy_bytes.as_slice()).unwrap();
+    assert_eq!(decoded, expected);
+    assert_eq!(decoded.encode_to_vec(), expected.encode_to_vec());
+}
+
+#[test]
+fn app_announcement_ignores_removed_timestamp_field() {
+    let expected = AnnounceAppId {
+        encrypted_ipcp: vec![13, 14, 15],
+        orb_nonce: vec![4, 5, 6],
+        integrity_token: "integrity-token".into(),
+        integrity_signature: vec![19, 20, 21],
+        ..Default::default()
+    };
+    let mut legacy_bytes = expected.encode_to_vec();
+    legacy_bytes.extend_from_slice(&[0x68, 0x80, 0x8d, 0xd8, 0xb6, 0x06]);
 
     let decoded = AnnounceAppId::decode(legacy_bytes.as_slice()).unwrap();
     assert_eq!(decoded, expected);
@@ -102,12 +117,11 @@ fn app_announcement_preserves_remaining_field_numbers() {
         orb_nonce: vec![2],
         integrity_token: "jwt".into(),
         integrity_signature: vec![3],
-        integrity_timestamp: 1,
         ..Default::default()
     };
 
     assert_eq!(
         announcement.encode_to_vec(),
-        [0x42, 1, 1, 0x52, 1, 2, 0x5a, 3, b'j', b'w', b't', 0x62, 1, 3, 0x68, 1]
+        [0x42, 1, 1, 0x52, 1, 2, 0x5a, 3, b'j', b'w', b't', 0x62, 1, 3]
     );
 }

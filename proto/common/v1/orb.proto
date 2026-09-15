@@ -95,7 +95,7 @@ message AppAuthenticatedData {
 }
 
 message AnnounceAppId {
-  reserved 9;
+  reserved 9, 13;
 
   uint64 protocol_version = 1;
   bool heartbeat = 2;
@@ -112,6 +112,4 @@ message AnnounceAppId {
   string integrity_token = 11;
   // App integrity signature over the announcement, including the full encrypted_ipcp.
   bytes integrity_signature = 12;
-  // Unix timestamp in seconds used by the App integrity signer.
-  int64 integrity_timestamp = 13;
 }
