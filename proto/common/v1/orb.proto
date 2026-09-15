@@ -29,8 +29,6 @@ message P2pNodeInfo {
 }
 
 message AnnounceOrbId {
-  reserved 14;
-
   enum ModeType {
     MODE_TYPE_UNSPECIFIED = 0;
     MODE_TYPE_LEGACY = 1;
@@ -95,8 +93,6 @@ message AppAuthenticatedData {
 }
 
 message AnnounceAppId {
-  reserved 9, 13;
-
   uint64 protocol_version = 1;
   bool heartbeat = 2;
   AppAuthenticatedData app_data = 3;
