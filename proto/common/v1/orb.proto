@@ -97,6 +97,9 @@ message AppAuthenticatedData {
 }
 
 message AnnounceAppId {
+  reserved 9;
+  reserved "encrypted_ipcp_hash";
+
   uint64 protocol_version = 1;
   bool heartbeat = 2;
   AppAuthenticatedData app_data = 3;
@@ -106,13 +109,11 @@ message AnnounceAppId {
   P2pNodeInfo p2p_node_info = 7;
   // iPCP PNG encrypted to AnnounceOrbId.ipcp_encryption_public_key.
   bytes encrypted_ipcp = 8;
-  // Hash of encrypted_ipcp, covered by the App signature.
-  bytes encrypted_ipcp_hash = 9;
   // Echo of AnnounceOrbId.orb_nonce.
   bytes orb_nonce = 10;
-  // Attestation Gateway token identifying the App integrity signing key.
+  // Attestation Gateway JWT identifying the App integrity signing key in cnf.jwk.
   string integrity_token = 11;
-  // Signature returned by the App integrity signer over the App announcement.
+  // App integrity signature over the announcement, including the full encrypted_ipcp.
   bytes integrity_signature = 12;
   // Unix timestamp in seconds used by the App integrity signer.
   int64 integrity_timestamp = 13;
