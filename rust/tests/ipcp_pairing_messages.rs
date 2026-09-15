@@ -1,5 +1,5 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId},
+    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload},
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -22,7 +22,10 @@ fn ipcp_pairing_fields_round_trip() {
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
-        encrypted_ipcp: vec![13, 14, 15],
+        encrypted_ipcp: Some(IpcpHpkePayload {
+            enc: vec![13, 14, 15],
+            ciphertext: vec![16, 17, 18],
+        }),
         orb_nonce: vec![4, 5, 6],
         integrity_token: "integrity-token".into(),
         integrity_signature: vec![19, 20, 21],
@@ -41,6 +44,40 @@ fn ipcp_pairing_fields_round_trip() {
 #[test]
 fn pairing_request_rejects_truncated_request_nonce() {
     assert!(PairingRequest::decode([0x22, 0x80].as_slice()).is_err());
+}
+
+#[test]
+fn hpke_payload_uses_expected_field_numbers() {
+    let payload = IpcpHpkePayload {
+        enc: vec![1],
+        ciphertext: vec![2, 3],
+    };
+    let encoded = [0x0a, 1, 1, 0x12, 2, 2, 3];
+
+    assert_eq!(payload.encode_to_vec(), encoded);
+    assert_eq!(
+        IpcpHpkePayload::decode(encoded.as_slice()).unwrap(),
+        payload
+    );
+}
+
+#[test]
+fn app_announcement_rejects_truncated_hpke_fields() {
+    for field in [0x0a, 0x12] {
+        assert!(AnnounceAppId::decode([0x42, 2, field, 0x80].as_slice()).is_err());
+    }
+}
+
+#[test]
+fn app_announcement_round_trips_without_hpke_payload() {
+    let announcement = AnnounceAppId {
+        protocol_version: 1,
+        heartbeat: true,
+        ..Default::default()
+    };
+
+    assert!(announcement.encrypted_ipcp.is_none());
+    assert_eq!(round_trip(announcement.clone()), announcement);
 }
 
 #[test]
@@ -79,7 +116,10 @@ fn orb_announcement_preserves_remaining_field_numbers() {
 #[test]
 fn app_announcement_ignores_removed_hash_field() {
     let expected = AnnounceAppId {
-        encrypted_ipcp: vec![13, 14, 15],
+        encrypted_ipcp: Some(IpcpHpkePayload {
+            enc: vec![13, 14, 15],
+            ciphertext: vec![16, 17, 18],
+        }),
         orb_nonce: vec![4, 5, 6],
         integrity_token: "integrity-token".into(),
         integrity_signature: vec![19, 20, 21],
@@ -96,7 +136,10 @@ fn app_announcement_ignores_removed_hash_field() {
 #[test]
 fn app_announcement_ignores_removed_timestamp_field() {
     let expected = AnnounceAppId {
-        encrypted_ipcp: vec![13, 14, 15],
+        encrypted_ipcp: Some(IpcpHpkePayload {
+            enc: vec![13, 14, 15],
+            ciphertext: vec![16, 17, 18],
+        }),
         orb_nonce: vec![4, 5, 6],
         integrity_token: "integrity-token".into(),
         integrity_signature: vec![19, 20, 21],
@@ -113,7 +156,10 @@ fn app_announcement_ignores_removed_timestamp_field() {
 #[test]
 fn app_announcement_preserves_remaining_field_numbers() {
     let announcement = AnnounceAppId {
-        encrypted_ipcp: vec![1],
+        encrypted_ipcp: Some(IpcpHpkePayload {
+            enc: vec![1],
+            ciphertext: vec![2, 3],
+        }),
         orb_nonce: vec![2],
         integrity_token: "jwt".into(),
         integrity_signature: vec![3],
@@ -122,6 +168,9 @@ fn app_announcement_preserves_remaining_field_numbers() {
 
     assert_eq!(
         announcement.encode_to_vec(),
-        [0x42, 1, 1, 0x52, 1, 2, 0x5a, 3, b'j', b'w', b't', 0x62, 1, 3]
+        [
+            0x42, 7, 0x0a, 1, 1, 0x12, 2, 2, 3, 0x52, 1, 2, 0x5a, 3, b'j', b'w', b't',
+            0x62, 1, 3
+        ]
     );
 }

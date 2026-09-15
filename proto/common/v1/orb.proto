@@ -92,6 +92,11 @@ message AppAuthenticatedData {
   string device_public_key = 7;
 }
 
+message IpcpHpkePayload {
+  bytes enc = 1;
+  bytes ciphertext = 2;
+}
+
 message AnnounceAppId {
   uint64 protocol_version = 1;
   bool heartbeat = 2;
@@ -100,7 +105,7 @@ message AnnounceAppId {
   string bypass_age_verification_token = 5;
   bool is_test = 6;
   P2pNodeInfo p2p_node_info = 7;
-  bytes encrypted_ipcp = 8;
+  IpcpHpkePayload encrypted_ipcp = 8;
   // Echo of AnnounceOrbId.orb_nonce.
   bytes orb_nonce = 10;
   // Attestation Gateway JWT identifying the App integrity signing key in cnf.jwk.
