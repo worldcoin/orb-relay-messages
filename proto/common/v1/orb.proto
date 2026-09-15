@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package common.v1;
 
-import "google/protobuf/timestamp.proto";
-
 // Wrapper message for all messages that can be sent to and from the orb. The reason we do this is to ensure static
 // typing in the clients while the server can still handle all messages through the Any type.
 message W {
@@ -31,6 +29,8 @@ message P2pNodeInfo {
 }
 
 message AnnounceOrbId {
+  reserved 14;
+
   enum ModeType {
     MODE_TYPE_UNSPECIFIED = 0;
     MODE_TYPE_LEGACY = 1;
@@ -66,8 +66,6 @@ message AnnounceOrbId {
   bytes ipcp_encryption_public_key = 12;
   // Fresh challenge that the App must echo in AnnounceAppId.
   bytes orb_nonce = 13;
-  // Deadline after which this pairing attempt is invalid.
-  google.protobuf.Timestamp expires_at = 14;
   // Fresh App challenge from PairingRequest; only used for scan-to-pair.
   bytes request_nonce = 15;
   // SE050 message-key signature over the Orb announcement.
