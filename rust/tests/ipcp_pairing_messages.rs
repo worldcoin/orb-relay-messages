@@ -22,7 +22,7 @@ fn ipcp_pairing_fields_round_trip() {
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
-        encrypted_ipcp: Some(IpcpHpkePayload {
+        encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![13, 14, 15],
             ciphertext: vec![16, 17, 18],
         }),
@@ -76,7 +76,7 @@ fn app_announcement_round_trips_without_hpke_payload() {
         ..Default::default()
     };
 
-    assert!(announcement.encrypted_ipcp.is_none());
+    assert!(announcement.encrypted_ipcp_payload.is_none());
     assert_eq!(round_trip(announcement.clone()), announcement);
 }
 
@@ -116,7 +116,7 @@ fn orb_announcement_preserves_remaining_field_numbers() {
 #[test]
 fn app_announcement_ignores_removed_hash_field() {
     let expected = AnnounceAppId {
-        encrypted_ipcp: Some(IpcpHpkePayload {
+        encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![13, 14, 15],
             ciphertext: vec![16, 17, 18],
         }),
@@ -136,7 +136,7 @@ fn app_announcement_ignores_removed_hash_field() {
 #[test]
 fn app_announcement_ignores_removed_timestamp_field() {
     let expected = AnnounceAppId {
-        encrypted_ipcp: Some(IpcpHpkePayload {
+        encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![13, 14, 15],
             ciphertext: vec![16, 17, 18],
         }),
@@ -156,7 +156,7 @@ fn app_announcement_ignores_removed_timestamp_field() {
 #[test]
 fn app_announcement_preserves_remaining_field_numbers() {
     let announcement = AnnounceAppId {
-        encrypted_ipcp: Some(IpcpHpkePayload {
+        encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![1],
             ciphertext: vec![2, 3],
         }),

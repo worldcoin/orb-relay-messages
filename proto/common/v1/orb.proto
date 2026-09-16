@@ -110,6 +110,6 @@ message AnnounceAppId {
   bytes orb_nonce = 10;
   // Attestation Gateway JWT identifying the App integrity signing key in cnf.jwk.
   string integrity_token = 11;
-  // App integrity signature over the announcement, including the full encrypted_ipcp.
+  // App integrity signature over the announcement, including the full encrypted_ipcp_payload.
   bytes integrity_signature = 12;
 }
