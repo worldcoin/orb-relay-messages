@@ -1,5 +1,5 @@
 [toolchain]
-channel = "1.91.1" # See Cargo.toml
+channel = "1.98.1" # See Cargo.toml
 targets = [
   "aarch64-unknown-linux-gnu",
   "x86_64-unknown-linux-gnu",
