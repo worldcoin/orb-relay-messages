@@ -96,6 +96,8 @@ message SignupEnded {
     FAILURE_FEEDBACK_TYPE_PCP_UPLOAD_FAILED = 21;
     // This orb failed (hardware, outdated OS, on-device crash); not the backend, not the user.
     FAILURE_FEEDBACK_TYPE_ORB_INTERNAL_ERROR = 22;
+    // Captured biometrics did not match the user's iPCP.
+    FAILURE_FEEDBACK_TYPE_IPCP_MISMATCH = 23;
   }
 
   bool success = 1;
