@@ -114,6 +114,43 @@ fn orb_announcement_preserves_remaining_field_numbers() {
 }
 
 #[test]
+fn orb_announcement_signing_transcript_layout() {
+    let announcement = AnnounceOrbId {
+        orb_id: "ab".into(),
+        ipcp_encryption_public_key: vec![1, 2, 3],
+        orb_nonce: vec![4],
+        request_nonce: vec![],
+        signature: vec![9, 9],
+        heartbeat: true,
+        ..Default::default()
+    };
+
+    let mut expected = b"orb-relay/announce-orb-id/v1".to_vec();
+    expected.extend_from_slice(&[2, 0, 0, 0, b'a', b'b']);
+    expected.extend_from_slice(&[3, 0, 0, 0, 1, 2, 3]);
+    expected.extend_from_slice(&[1, 0, 0, 0, 4]);
+    expected.extend_from_slice(&[0, 0, 0, 0]);
+
+    assert_eq!(announcement.signing_transcript(), expected);
+}
+
+#[test]
+fn orb_announcement_signing_transcript_separates_fields() {
+    let a = AnnounceOrbId {
+        ipcp_encryption_public_key: vec![1, 2],
+        orb_nonce: vec![3],
+        ..Default::default()
+    };
+    let b = AnnounceOrbId {
+        ipcp_encryption_public_key: vec![1],
+        orb_nonce: vec![2, 3],
+        ..Default::default()
+    };
+
+    assert_ne!(a.signing_transcript(), b.signing_transcript());
+}
+
+#[test]
 fn app_announcement_ignores_removed_hash_field() {
     let expected = AnnounceAppId {
         encrypted_ipcp_payload: Some(IpcpHpkePayload {

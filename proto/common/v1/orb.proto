@@ -66,7 +66,10 @@ message AnnounceOrbId {
   bytes orb_nonce = 13;
   // Fresh App challenge from PairingRequest; only used for scan-to-pair.
   bytes request_nonce = 15;
-  // SE050 message-key signature over the Orb announcement.
+  // DER-encoded ECDSA P-256 SHA-256 signature by the Orb SE050 attestation key over the
+  // signing transcript: "orb-relay/announce-orb-id/v1", then orb_id,
+  // ipcp_encryption_public_key, orb_nonce and request_nonce, each prefixed with its
+  // length as a little-endian u32.
   bytes signature = 16;
 }
 

@@ -68,6 +68,33 @@ pub mod common {
             }
         }
 
+        impl AnnounceOrbId {
+            /// Domain tag so a signature made for any other use of the orb attestation key
+            /// never verifies as an `AnnounceOrbId` signature.
+            pub const SIGNING_DOMAIN: &'static [u8] = b"orb-relay/announce-orb-id/v1";
+
+            /// Bytes the orb signs into `signature` with its SE050 attestation key
+            /// (ECDSA P-256 over SHA-256), and the app verifies it against.
+            ///
+            /// [`Self::SIGNING_DOMAIN`] followed by `orb_id`, `ipcp_encryption_public_key`,
+            /// `orb_nonce` and `request_nonce`, each prefixed with its length as a
+            /// little-endian `u32`.
+            pub fn signing_transcript(&self) -> Vec<u8> {
+                let mut transcript = Self::SIGNING_DOMAIN.to_vec();
+                for v in [
+                    self.orb_id.as_bytes(),
+                    &self.ipcp_encryption_public_key,
+                    &self.orb_nonce,
+                    &self.request_nonce,
+                ] {
+                    let len = u32::try_from(v.len()).expect("less than u32::MAX");
+                    transcript.extend_from_slice(&len.to_le_bytes());
+                    transcript.extend_from_slice(v);
+                }
+                transcript
+            }
+        }
+
         /// Default PCP version value.
         const PCP_VERSION_DEFAULT: u32 = 2;
 
