@@ -144,7 +144,7 @@ fn signed_orb_announcement_uses_expected_field_numbers() {
 }
 
 #[test]
-fn signed_orb_announcement_transcript_is_domain_then_announcement() {
+fn signed_orb_announcement_transcript_is_announcement() {
     let announcement = AnnounceOrbId {
         orb_id: "ab".into(),
         orb_nonce: vec![4],
@@ -157,10 +157,7 @@ fn signed_orb_announcement_transcript_is_domain_then_announcement() {
         signature: vec![9, 9],
     };
 
-    let mut expected = b"orb-relay/announce-orb-id/v1".to_vec();
-    expected.extend_from_slice(&announcement);
-
-    assert_eq!(signed.signing_transcript(), Ok(expected));
+    assert_eq!(signed.signing_transcript(), Ok(announcement.as_slice()));
 }
 
 #[test]

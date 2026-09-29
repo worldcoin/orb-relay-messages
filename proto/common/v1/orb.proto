@@ -72,13 +72,12 @@ message AnnounceOrbId {
 
 // AnnounceOrbId signed by the Orb SE050 attestation key.
 message SignedAnnounceOrbId {
-  // Selects the signing domain, so the signature binds it without it being inside announcement.
+  // Selects how announcement and signature are verified.
   uint32 version = 1;
   // Serialized AnnounceOrbId, kept as bytes because protobuf encoding is not canonical:
   // the App verifies the exact bytes the Orb signed, then decodes them.
   bytes announcement = 2;
-  // DER-encoded ECDSA P-256 SHA-256 signature over
-  // "orb-relay/announce-orb-id/v{version}" followed by announcement.
+  // DER-encoded ECDSA P-256 SHA-256 signature over announcement.
   bytes signature = 3;
 }
 
