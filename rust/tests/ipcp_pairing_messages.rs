@@ -1,5 +1,8 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload},
+    common::v1::{
+        AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, SignedAnnounceOrbId,
+        UnsupportedVersion,
+    },
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -18,7 +21,6 @@ fn ipcp_pairing_fields_round_trip() {
         ipcp_encryption_public_key: vec![1, 2, 3],
         orb_nonce: vec![4, 5, 6],
         request_nonce: vec![7, 8, 9],
-        signature: vec![10, 11, 12],
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
@@ -86,7 +88,6 @@ fn orb_announcement_ignores_removed_expiry_field() {
         ipcp_encryption_public_key: vec![1, 2, 3],
         orb_nonce: vec![4, 5, 6],
         request_nonce: vec![7, 8, 9],
-        signature: vec![10, 11, 12],
         ..Default::default()
     };
     let mut legacy_bytes = expected.encode_to_vec();
@@ -103,51 +104,78 @@ fn orb_announcement_preserves_remaining_field_numbers() {
         ipcp_encryption_public_key: vec![1],
         orb_nonce: vec![2],
         request_nonce: vec![3],
-        signature: vec![4],
         ..Default::default()
     };
 
     assert_eq!(
         announcement.encode_to_vec(),
-        [0x62, 1, 1, 0x6a, 1, 2, 0x7a, 1, 3, 0x82, 1, 1, 4]
+        [0x62, 1, 1, 0x6a, 1, 2, 0x7a, 1, 3]
     );
 }
 
 #[test]
-fn orb_announcement_signing_transcript_layout() {
-    let announcement = AnnounceOrbId {
-        orb_id: "ab".into(),
-        ipcp_encryption_public_key: vec![1, 2, 3],
-        orb_nonce: vec![4],
-        request_nonce: vec![],
-        signature: vec![9, 9],
-        heartbeat: true,
+fn orb_announcement_ignores_removed_signature_field() {
+    let expected = AnnounceOrbId {
+        orb_nonce: vec![4, 5, 6],
         ..Default::default()
     };
+    let mut legacy_bytes = expected.encode_to_vec();
+    legacy_bytes.extend_from_slice(&[0x82, 1, 2, 9, 9]);
 
-    let mut expected = b"orb-relay/announce-orb-id/v1".to_vec();
-    expected.extend_from_slice(&[2, 0, 0, 0, b'a', b'b']);
-    expected.extend_from_slice(&[3, 0, 0, 0, 1, 2, 3]);
-    expected.extend_from_slice(&[1, 0, 0, 0, 4]);
-    expected.extend_from_slice(&[0, 0, 0, 0]);
-
-    assert_eq!(announcement.signing_transcript(), expected);
+    let decoded = AnnounceOrbId::decode(legacy_bytes.as_slice()).unwrap();
+    assert_eq!(decoded, expected);
+    assert_eq!(decoded.encode_to_vec(), expected.encode_to_vec());
 }
 
 #[test]
-fn orb_announcement_signing_transcript_separates_fields() {
-    let a = AnnounceOrbId {
-        ipcp_encryption_public_key: vec![1, 2],
-        orb_nonce: vec![3],
-        ..Default::default()
+fn signed_orb_announcement_uses_expected_field_numbers() {
+    let signed = SignedAnnounceOrbId {
+        version: 1,
+        announcement: vec![2],
+        signature: vec![3, 4],
     };
-    let b = AnnounceOrbId {
-        ipcp_encryption_public_key: vec![1],
-        orb_nonce: vec![2, 3],
+    let encoded = [0x08, 1, 0x12, 1, 2, 0x1a, 2, 3, 4];
+
+    assert_eq!(signed.encode_to_vec(), encoded);
+    assert_eq!(
+        SignedAnnounceOrbId::decode(encoded.as_slice()).unwrap(),
+        signed
+    );
+}
+
+#[test]
+fn signed_orb_announcement_transcript_is_domain_then_announcement() {
+    let announcement = AnnounceOrbId {
+        orb_id: "ab".into(),
+        orb_nonce: vec![4],
         ..Default::default()
+    }
+    .encode_to_vec();
+    let signed = SignedAnnounceOrbId {
+        version: SignedAnnounceOrbId::VERSION,
+        announcement: announcement.clone(),
+        signature: vec![9, 9],
     };
 
-    assert_ne!(a.signing_transcript(), b.signing_transcript());
+    let mut expected = b"orb-relay/announce-orb-id/v1".to_vec();
+    expected.extend_from_slice(&announcement);
+
+    assert_eq!(signed.signing_transcript(), Ok(expected));
+}
+
+#[test]
+fn signed_orb_announcement_rejects_unknown_versions() {
+    for version in [0, 2] {
+        let signed = SignedAnnounceOrbId {
+            version,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            signed.signing_transcript(),
+            Err(UnsupportedVersion(version))
+        );
+    }
 }
 
 #[test]
