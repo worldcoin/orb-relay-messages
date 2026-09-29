@@ -1,5 +1,5 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload},
+    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, OrbAuthenticatedData},
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -15,10 +15,13 @@ where
 #[test]
 fn ipcp_pairing_fields_round_trip() {
     let orb_announcement = AnnounceOrbId {
-        ipcp_encryption_public_key: vec![1, 2, 3],
-        orb_nonce: vec![4, 5, 6],
-        request_nonce: vec![7, 8, 9],
-        signature: vec![10, 11, 12],
+        orb_data: Some(OrbAuthenticatedData {
+            version: 1,
+            ipcp_encryption_public_key: vec![1, 2, 3],
+            orb_nonce: vec![4, 5, 6],
+            request_nonce: vec![7, 8, 9],
+        }),
+        orb_data_signature: vec![10, 11, 12],
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
@@ -83,10 +86,13 @@ fn app_announcement_round_trips_without_hpke_payload() {
 #[test]
 fn orb_announcement_ignores_removed_expiry_field() {
     let expected = AnnounceOrbId {
-        ipcp_encryption_public_key: vec![1, 2, 3],
-        orb_nonce: vec![4, 5, 6],
-        request_nonce: vec![7, 8, 9],
-        signature: vec![10, 11, 12],
+        orb_data: Some(OrbAuthenticatedData {
+            version: 1,
+            ipcp_encryption_public_key: vec![1, 2, 3],
+            orb_nonce: vec![4, 5, 6],
+            request_nonce: vec![7, 8, 9],
+        }),
+        orb_data_signature: vec![10, 11, 12],
         ..Default::default()
     };
     let mut legacy_bytes = expected.encode_to_vec();
@@ -100,16 +106,19 @@ fn orb_announcement_ignores_removed_expiry_field() {
 #[test]
 fn orb_announcement_preserves_remaining_field_numbers() {
     let announcement = AnnounceOrbId {
-        ipcp_encryption_public_key: vec![1],
-        orb_nonce: vec![2],
-        request_nonce: vec![3],
-        signature: vec![4],
+        orb_data: Some(OrbAuthenticatedData {
+            version: 1,
+            ipcp_encryption_public_key: vec![1],
+            orb_nonce: vec![2],
+            request_nonce: vec![3],
+        }),
+        orb_data_signature: vec![4],
         ..Default::default()
     };
 
     assert_eq!(
         announcement.encode_to_vec(),
-        [0x62, 1, 1, 0x6a, 1, 2, 0x7a, 1, 3, 0x82, 1, 1, 4]
+        [0x62, 11, 0x08, 1, 0x12, 1, 1, 0x1a, 1, 2, 0x22, 1, 3, 0x6a, 1, 4]
     );
 }
 

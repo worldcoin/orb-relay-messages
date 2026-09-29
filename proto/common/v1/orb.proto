@@ -60,14 +60,19 @@ message AnnounceOrbId {
   string signup_id = 9;
   string signup_id_pin = 10;
   P2pNodeInfo p2p_node_info = 11;
+  OrbAuthenticatedData orb_data = 12;
+  // SE050 message-key signature over the OrbAuthenticatedData
+  bytes orb_data_signature = 13;
+}
+
+message OrbAuthenticatedData {
+  uint32 version = 1;
   // Ephemeral public key used by the App to encrypt the iPCP payload.
-  bytes ipcp_encryption_public_key = 12;
+  bytes ipcp_encryption_public_key = 2;
   // Fresh challenge that the App must echo in AnnounceAppId.
-  bytes orb_nonce = 13;
+  bytes orb_nonce = 3;
   // Fresh App challenge from PairingRequest; only used for scan-to-pair.
-  bytes request_nonce = 15;
-  // SE050 message-key signature over the Orb announcement.
-  bytes signature = 16;
+  bytes request_nonce = 4;
 }
 
 // Appointment metadata for verification purposes
