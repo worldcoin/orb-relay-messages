@@ -10,7 +10,6 @@ message W {
     AnnounceOrbId announce_orb_id = 2;
     AnnounceAppId announce_app_id = 3;
     Heartbeat heartbeat = 4;
-    SignedAnnounceOrbId signed_announce_orb_id = 5;
   }
 }
 
@@ -67,18 +66,11 @@ message AnnounceOrbId {
   bytes orb_nonce = 13;
   // Fresh App challenge from PairingRequest; only used for scan-to-pair.
   bytes request_nonce = 15;
-  reserved 16;
-}
-
-// AnnounceOrbId signed by the Orb SE050 attestation key.
-message SignedAnnounceOrbId {
-  // Selects how announcement and signature are verified.
-  uint32 version = 1;
-  // Serialized AnnounceOrbId, kept as bytes because protobuf encoding is not canonical:
-  // the App verifies the exact bytes the Orb signed, then decodes them.
-  bytes announcement = 2;
-  // DER-encoded ECDSA P-256 SHA-256 signature over announcement.
-  bytes signature = 3;
+  // DER-encoded ECDSA P-256 SHA-256 signature by the Orb SE050 attestation key over the
+  // signing transcript: "orb-relay/announce-orb-id/v1", then orb_id,
+  // ipcp_encryption_public_key, orb_nonce and request_nonce, each prefixed with its
+  // length as a little-endian u32.
+  bytes signature = 16;
 }
 
 // Appointment metadata for verification purposes
