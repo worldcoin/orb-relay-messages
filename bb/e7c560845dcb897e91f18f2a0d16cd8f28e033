@@ -1,0 +1,21 @@
+proto/self_serve/orb/v1/orb.proto
+  s_a30d2376675fd1::t_dc3df6409debe4 104-110,113
+rust/tests/signup_face_check_comparison.rs
+  s_a30d2376675fd1::t_51771acaf9b259 1-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "bbe7c560845dcb897e91f18f2a0d16cd8f28e033",
+  "prompts": {},
+  "sessions": {
+    "s_a30d2376675fd1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f706-17c6-70d0-a265-cff7882c22b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "mustafakuloglu <mustafakuloglunun@gmail.com>"
+    }
+  }
+}
