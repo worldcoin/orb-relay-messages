@@ -1,0 +1,19 @@
+proto/self_serve/orb/v1/orb.proto
+  s_a30d2376675fd1::t_dc3df6409debe4 104-110,113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "146fb300418ed5304c0e2c44d3b5b3f331d0c7b4",
+  "prompts": {},
+  "sessions": {
+    "s_a30d2376675fd1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0f706-17c6-70d0-a265-cff7882c22b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "mustafakuloglu <mustafakuloglunun@gmail.com>"
+    }
+  }
+}
