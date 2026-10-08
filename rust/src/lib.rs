@@ -93,31 +93,38 @@ pub mod common {
             Unhashable(#[from] HashError),
             #[error("the data does not match the hash")]
             Mismatch,
+            #[error("the app announcement has no app data")]
+            MissingAppData,
+            #[error("the app announcement did not echo the Orb nonce")]
+            OrbNonceMismatch,
         }
-
-        /// The [`AnnounceAppId`] did not echo the Orb nonce.
-        #[derive(Debug, Clone, PartialEq, Eq, Error)]
-        #[error("the app announcement did not echo the Orb nonce")]
-        pub struct NonceMismatch;
 
         impl AnnounceAppId {
             /// First app data version whose producers echo the Orb nonce.
             const ORB_NONCE_APP_DATA_VERSION: u32 = 2;
 
-            /// Checks that this announcement echoes `orb_data.orb_nonce`.
+            /// Checks `app_data` against the QR `hash`, then that apps from app
+            /// data v2 echo the nonce of `orb_data`, when the Orb sent one.
             ///
-            /// Apps before app data v2 don't echo the nonce and pass. The version
-            /// can't be downgraded, because [`AppAuthenticatedData::verify`] binds
-            /// it to the QR hash, so callers must run both checks.
-            pub fn verify_orb_nonce(
+            /// The hash check binds the version first, so it can't be downgraded
+            /// to skip the nonce check.
+            pub fn verify(
                 &self,
-                orb_data: &OrbAuthenticatedData,
-            ) -> Result<(), NonceMismatch> {
-                let version = self.app_data.as_ref().map_or(0, |data| data.version);
-                (version < Self::ORB_NONCE_APP_DATA_VERSION
-                    || self.orb_nonce == orb_data.orb_nonce)
-                    .then_some(())
-                    .ok_or(NonceMismatch)
+                hash: impl AsRef<[u8]>,
+                orb_data: Option<&OrbAuthenticatedData>,
+            ) -> Result<(), VerifyError> {
+                let app_data =
+                    self.app_data.as_ref().ok_or(VerifyError::MissingAppData)?;
+                app_data.verify(hash)?;
+                match orb_data {
+                    Some(orb_data)
+                        if app_data.version >= Self::ORB_NONCE_APP_DATA_VERSION
+                            && self.orb_nonce != orb_data.orb_nonce =>
+                    {
+                        Err(VerifyError::OrbNonceMismatch)
+                    }
+                    _ => Ok(()),
+                }
             }
         }
 
@@ -268,7 +275,10 @@ pub mod jobs {
 
 #[cfg(test)]
 mod tests {
-    use super::common::v1::{AppAuthenticatedData, HashError, VerifyError};
+    use super::common::v1::{
+        AnnounceAppId, AppAuthenticatedData, HashError, OrbAuthenticatedData,
+        VerifyError,
+    };
     use blake3::Hasher;
 
     fn app_data(version: u32) -> AppAuthenticatedData {
@@ -427,5 +437,45 @@ mod tests {
 
         assert_eq!(legacy_hash(&data_a, 16), legacy_hash(&data_b, 16));
         assert_ne!(data_a.hash(16).unwrap(), data_b.hash(16).unwrap());
+    }
+
+    #[test]
+    fn announce_verify_enforces_orb_nonce_from_app_data_v2() {
+        let orb_data = OrbAuthenticatedData {
+            orb_nonce: vec![1, 2, 3],
+            ..Default::default()
+        };
+        let v1 = app_data(1);
+        let v2 = app_data(AppAuthenticatedData::VERSION);
+        let (v1_hash, v2_hash) = (v1_hash(&v1, 16), v2.hash(16).unwrap());
+        let announce =
+            |app_data: &AppAuthenticatedData, orb_nonce: &[u8]| AnnounceAppId {
+                app_data: Some(app_data.clone()),
+                orb_nonce: orb_nonce.to_vec(),
+                ..Default::default()
+            };
+
+        assert_eq!(
+            announce(&v2, &[1, 2, 3]).verify(&v2_hash, Some(&orb_data)),
+            Ok(())
+        );
+        assert_eq!(
+            announce(&v2, &[]).verify(&v2_hash, Some(&orb_data)),
+            Err(VerifyError::OrbNonceMismatch)
+        );
+        assert_eq!(announce(&v2, &[]).verify(&v2_hash, None), Ok(()));
+        assert_eq!(announce(&v1, &[]).verify(&v1_hash, Some(&orb_data)), Ok(()));
+        // A v1 claim under a v2 QR hash fails the hash check before the nonce is skipped.
+        let mut downgraded = v2.clone();
+        downgraded.version = 1;
+        downgraded.device_public_key.clear();
+        assert_eq!(
+            announce(&downgraded, &[]).verify(&v2_hash, Some(&orb_data)),
+            Err(VerifyError::Mismatch)
+        );
+        assert_eq!(
+            AnnounceAppId::default().verify(&v2_hash, Some(&orb_data)),
+            Err(VerifyError::MissingAppData)
+        );
     }
 }
