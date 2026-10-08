@@ -95,6 +95,32 @@ pub mod common {
             Mismatch,
         }
 
+        /// The [`AnnounceAppId`] did not echo the Orb nonce.
+        #[derive(Debug, Clone, PartialEq, Eq, Error)]
+        #[error("the app announcement did not echo the Orb nonce")]
+        pub struct NonceMismatch;
+
+        impl AnnounceAppId {
+            /// First app data version whose producers echo the Orb nonce.
+            const ORB_NONCE_APP_DATA_VERSION: u32 = 2;
+
+            /// Checks that this announcement echoes `orb_data.orb_nonce`.
+            ///
+            /// Apps before app data v2 don't echo the nonce and pass. The version
+            /// can't be downgraded, because [`AppAuthenticatedData::verify`] binds
+            /// it to the QR hash, so callers must run both checks.
+            pub fn verify_orb_nonce(
+                &self,
+                orb_data: &OrbAuthenticatedData,
+            ) -> Result<(), NonceMismatch> {
+                let version = self.app_data.as_ref().map_or(0, |data| data.version);
+                (version < Self::ORB_NONCE_APP_DATA_VERSION
+                    || self.orb_nonce == orb_data.orb_nonce)
+                    .then_some(())
+                    .ok_or(NonceMismatch)
+            }
+        }
+
         impl AppAuthenticatedData {
             /// Current hash format version for new producers.
             pub const VERSION: u32 = 2;

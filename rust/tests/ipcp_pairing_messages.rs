@@ -1,5 +1,8 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, OrbAuthenticatedData},
+    common::v1::{
+        AnnounceAppId, AnnounceOrbId, AppAuthenticatedData, IpcpHpkePayload,
+        NonceMismatch, OrbAuthenticatedData,
+    },
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -182,4 +185,29 @@ fn app_announcement_preserves_remaining_field_numbers() {
             0x62, 1, 3
         ]
     );
+}
+
+#[test]
+fn verify_orb_nonce_only_enforces_from_app_data_v2() {
+    let orb_data = OrbAuthenticatedData {
+        orb_nonce: vec![1, 2, 3],
+        ..Default::default()
+    };
+    for (version, orb_nonce, expected) in [
+        (Some(2), vec![1, 2, 3], Ok(())),
+        (Some(2), vec![], Err(NonceMismatch)),
+        (Some(3), vec![9], Err(NonceMismatch)),
+        (Some(1), vec![], Ok(())),
+        (None, vec![], Ok(())),
+    ] {
+        let announcement = AnnounceAppId {
+            app_data: version.map(|version| AppAuthenticatedData {
+                version,
+                ..Default::default()
+            }),
+            orb_nonce,
+            ..Default::default()
+        };
+        assert_eq!(announcement.verify_orb_nonce(&orb_data), expected);
+    }
 }
