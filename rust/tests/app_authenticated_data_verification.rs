@@ -47,11 +47,3 @@ fn encode_decode_rejects_incorrect_app_data() {
         Err(VerifyError::Mismatch),
     );
 }
-
-#[test]
-fn ipcp_aad_binds_app_data_and_orb_nonce() {
-    let aad = make_app_data("0xabcd", 3).ipcp_aad(&[1, 2]).unwrap();
-
-    assert_ne!(aad, make_app_data("0x1234", 3).ipcp_aad(&[1, 2]).unwrap());
-    assert_ne!(aad, make_app_data("0xabcd", 3).ipcp_aad(&[1, 3]).unwrap());
-}

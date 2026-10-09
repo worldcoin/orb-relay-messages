@@ -119,13 +119,6 @@ pub mod common {
                 Ok(())
             }
 
-            /// HPKE aad binding the iPCP to this data and the session: `hash(32) || orb_nonce`.
-            pub fn ipcp_aad(&self, orb_nonce: &[u8]) -> Result<Vec<u8>, HashError> {
-                let mut aad = self.hash(32)?;
-                aad.extend_from_slice(orb_nonce);
-                Ok(aad)
-            }
-
             /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
             ///
             /// New producers should set `version` to [`Self::VERSION`] and
