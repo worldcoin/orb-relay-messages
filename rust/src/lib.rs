@@ -100,14 +100,17 @@ pub mod common {
         }
 
         impl AnnounceAppId {
+            /// First app protocol version that echoes the Orb nonce.
+            const ORB_NONCE_PROTOCOL_VERSION: u64 = 4;
             /// First app data version whose producers echo the Orb nonce.
             const ORB_NONCE_APP_DATA_VERSION: u32 = 2;
 
-            /// Checks `app_data` against the QR `hash`, then that apps from app
-            /// data v2 echo the nonce of `orb_data`, when the Orb sent one.
+            /// Checks `app_data` against the QR `hash`, then that apps on protocol
+            /// v4 or app data v2 echo the nonce of `orb_data`, when the Orb sent one.
             ///
-            /// The hash check binds the version first, so it can't be downgraded
-            /// to skip the nonce check.
+            /// `protocol_version` is unauthenticated, so the hash-bound app data
+            /// version also gates the nonce until the minimum supported protocol
+            /// version reaches v4.
             pub fn verify(
                 &self,
                 hash: impl AsRef<[u8]>,
@@ -118,7 +121,10 @@ pub mod common {
                 app_data.verify(hash)?;
                 match orb_data {
                     Some(orb_data)
-                        if app_data.version >= Self::ORB_NONCE_APP_DATA_VERSION
+                        if (self.protocol_version
+                            >= Self::ORB_NONCE_PROTOCOL_VERSION
+                            || app_data.version
+                                >= Self::ORB_NONCE_APP_DATA_VERSION)
                             && self.orb_nonce != orb_data.orb_nonce =>
                     {
                         Err(VerifyError::OrbNonceMismatch)
@@ -440,7 +446,7 @@ mod tests {
     }
 
     #[test]
-    fn announce_verify_enforces_orb_nonce_from_app_data_v2() {
+    fn announce_verify_enforces_orb_nonce_from_protocol_v4_or_app_data_v2() {
         let orb_data = OrbAuthenticatedData {
             orb_nonce: vec![1, 2, 3],
             ..Default::default()
@@ -465,6 +471,18 @@ mod tests {
         );
         assert_eq!(announce(&v2, &[]).verify(&v2_hash, None), Ok(()));
         assert_eq!(announce(&v1, &[]).verify(&v1_hash, Some(&orb_data)), Ok(()));
+        let protocol_v4 = |orb_nonce: &[u8]| AnnounceAppId {
+            protocol_version: 4,
+            ..announce(&v1, orb_nonce)
+        };
+        assert_eq!(
+            protocol_v4(&[1, 2, 3]).verify(&v1_hash, Some(&orb_data)),
+            Ok(())
+        );
+        assert_eq!(
+            protocol_v4(&[]).verify(&v1_hash, Some(&orb_data)),
+            Err(VerifyError::OrbNonceMismatch)
+        );
         // A v1 claim under a v2 QR hash fails the hash check before the nonce is skipped.
         let mut downgraded = v2.clone();
         downgraded.version = 1;
