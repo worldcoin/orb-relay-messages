@@ -97,6 +97,8 @@ message AppAuthenticatedData {
   string device_public_key = 7;
 }
 
+// HPKE-sealed iPCP. The AEAD aad is AppAuthenticatedData::ipcp_aad, so altering app_data
+// or orb_nonce makes decryption fail.
 message IpcpHpkePayload {
   bytes enc = 1;
   bytes ciphertext = 2;
@@ -113,8 +115,4 @@ message AnnounceAppId {
   IpcpHpkePayload encrypted_ipcp_payload = 8;
   // Echo of AnnounceOrbId.orb_nonce.
   bytes orb_nonce = 10;
-  // Attestation Gateway JWT identifying the App integrity signing key in cnf.jwk.
-  string integrity_token = 11;
-  // App integrity signature over the announcement, including the full encrypted_ipcp_payload.
-  bytes integrity_signature = 12;
 }

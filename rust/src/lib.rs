@@ -53,8 +53,6 @@ pub mod common {
                         "pcp_version": app_data.map(|data| data.pcp_version),
                         "app_data_version": app_data.map(|data| data.version),
                         "has_encrypted_ipcp_payload": self.encrypted_ipcp_payload.is_some(),
-                        "has_integrity_token": !self.integrity_token.is_empty(),
-                        "has_integrity_signature": !self.integrity_signature.is_empty(),
                         "has_bypass_age_verification_token": !self.bypass_age_verification_token.is_empty(),
                     }),
                     f,
@@ -119,6 +117,13 @@ pub mod common {
                     return Err(VerifyError::Mismatch);
                 }
                 Ok(())
+            }
+
+            /// HPKE aad binding the iPCP to this data and the session: `hash(32) || orb_nonce`.
+            pub fn ipcp_aad(&self, orb_nonce: &[u8]) -> Result<Vec<u8>, HashError> {
+                let mut aad = self.hash(32)?;
+                aad.extend_from_slice(orb_nonce);
+                Ok(aad)
             }
 
             /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
