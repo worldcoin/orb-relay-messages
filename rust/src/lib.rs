@@ -93,6 +93,38 @@ pub mod common {
             Unhashable(#[from] HashError),
             #[error("the data does not match the hash")]
             Mismatch,
+            #[error("the app announcement has no app data")]
+            MissingAppData,
+            #[error("the app announcement did not echo the Orb nonce")]
+            OrbNonceMismatch,
+        }
+
+        impl AnnounceAppId {
+            /// First app protocol version that echoes the Orb nonce.
+            const ORB_NONCE_PROTOCOL_VERSION: u64 = 4;
+
+            /// Checks `app_data` against the QR `hash`, then that apps from protocol
+            /// v4 echo the nonce of `orb_data`, when the Orb sent one.
+            pub fn verify(
+                &self,
+                hash: impl AsRef<[u8]>,
+                orb_data: Option<&OrbAuthenticatedData>,
+            ) -> Result<(), VerifyError> {
+                self.app_data
+                    .as_ref()
+                    .ok_or(VerifyError::MissingAppData)?
+                    .verify(hash)?;
+                match orb_data {
+                    Some(orb_data)
+                        if self.protocol_version
+                            >= Self::ORB_NONCE_PROTOCOL_VERSION
+                            && self.orb_nonce != orb_data.orb_nonce =>
+                    {
+                        Err(VerifyError::OrbNonceMismatch)
+                    }
+                    _ => Ok(()),
+                }
+            }
         }
 
         impl AppAuthenticatedData {
@@ -242,7 +274,10 @@ pub mod jobs {
 
 #[cfg(test)]
 mod tests {
-    use super::common::v1::{AppAuthenticatedData, HashError, VerifyError};
+    use super::common::v1::{
+        AnnounceAppId, AppAuthenticatedData, HashError, OrbAuthenticatedData,
+        VerifyError,
+    };
     use blake3::Hasher;
 
     fn app_data(version: u32) -> AppAuthenticatedData {
@@ -401,5 +436,40 @@ mod tests {
 
         assert_eq!(legacy_hash(&data_a, 16), legacy_hash(&data_b, 16));
         assert_ne!(data_a.hash(16).unwrap(), data_b.hash(16).unwrap());
+    }
+
+    #[test]
+    fn announce_verify_enforces_orb_nonce_from_protocol_v4() {
+        let orb_data = OrbAuthenticatedData {
+            orb_nonce: vec![1, 2, 3],
+            ..Default::default()
+        };
+        let app_data = app_data(AppAuthenticatedData::VERSION);
+        let hash = app_data.hash(16).unwrap();
+        let announce = |protocol_version: u64, orb_nonce: &[u8]| AnnounceAppId {
+            protocol_version,
+            app_data: Some(app_data.clone()),
+            orb_nonce: orb_nonce.to_vec(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            announce(4, &[1, 2, 3]).verify(&hash, Some(&orb_data)),
+            Ok(())
+        );
+        assert_eq!(
+            announce(4, &[]).verify(&hash, Some(&orb_data)),
+            Err(VerifyError::OrbNonceMismatch)
+        );
+        assert_eq!(announce(4, &[]).verify(&hash, None), Ok(()));
+        assert_eq!(announce(3, &[]).verify(&hash, Some(&orb_data)), Ok(()));
+        assert_eq!(
+            announce(4, &[1, 2, 3]).verify([0; 16], Some(&orb_data)),
+            Err(VerifyError::Mismatch)
+        );
+        assert_eq!(
+            AnnounceAppId::default().verify(&hash, Some(&orb_data)),
+            Err(VerifyError::MissingAppData)
+        );
     }
 }
