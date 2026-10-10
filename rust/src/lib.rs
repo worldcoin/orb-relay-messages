@@ -99,6 +99,26 @@ pub mod common {
             OrbNonceMismatch,
         }
 
+        /// An [`AnnounceAppId`] that passed [`AnnounceAppId::verify`]. Take this
+        /// instead of [`AnnounceAppId`] wherever the announcement is acted on.
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct VerifiedAnnounceAppId(AnnounceAppId);
+
+        impl VerifiedAnnounceAppId {
+            /// Skips verification, for test signups that carry no app data.
+            pub fn new_unchecked(announce_app_id: AnnounceAppId) -> Self {
+                Self(announce_app_id)
+            }
+        }
+
+        impl std::ops::Deref for VerifiedAnnounceAppId {
+            type Target = AnnounceAppId;
+
+            fn deref(&self) -> &AnnounceAppId {
+                &self.0
+            }
+        }
+
         impl AnnounceAppId {
             /// First app protocol version that echoes the Orb nonce.
             const ORB_NONCE_PROTOCOL_VERSION: u64 = 4;
@@ -106,10 +126,10 @@ pub mod common {
             /// Checks `app_data` against the QR `hash`, then that apps from protocol
             /// v4 echo the nonce of `orb_data`, when the Orb sent one.
             pub fn verify(
-                &self,
+                self,
                 hash: impl AsRef<[u8]>,
                 orb_data: Option<&OrbAuthenticatedData>,
-            ) -> Result<(), VerifyError> {
+            ) -> Result<VerifiedAnnounceAppId, VerifyError> {
                 self.app_data
                     .as_ref()
                     .ok_or(VerifyError::MissingAppData)?
@@ -122,7 +142,7 @@ pub mod common {
                     {
                         Err(VerifyError::OrbNonceMismatch)
                     }
-                    _ => Ok(()),
+                    _ => Ok(VerifiedAnnounceAppId(self)),
                 }
             }
         }
@@ -453,22 +473,31 @@ mod tests {
             ..Default::default()
         };
 
+        let verify = |announce: AnnounceAppId, hash: &[u8], orb_data| {
+            announce
+                .verify(hash, orb_data)
+                .map(|verified| (*verified).clone())
+        };
+
         assert_eq!(
-            announce(4, &[1, 2, 3]).verify(&hash, Some(&orb_data)),
-            Ok(())
+            verify(announce(4, &[1, 2, 3]), &hash, Some(&orb_data)),
+            Ok(announce(4, &[1, 2, 3]))
         );
         assert_eq!(
-            announce(4, &[]).verify(&hash, Some(&orb_data)),
+            verify(announce(4, &[]), &hash, Some(&orb_data)),
             Err(VerifyError::OrbNonceMismatch)
         );
-        assert_eq!(announce(4, &[]).verify(&hash, None), Ok(()));
-        assert_eq!(announce(3, &[]).verify(&hash, Some(&orb_data)), Ok(()));
+        assert_eq!(verify(announce(4, &[]), &hash, None), Ok(announce(4, &[])));
         assert_eq!(
-            announce(4, &[1, 2, 3]).verify([0; 16], Some(&orb_data)),
+            verify(announce(3, &[]), &hash, Some(&orb_data)),
+            Ok(announce(3, &[]))
+        );
+        assert_eq!(
+            verify(announce(4, &[1, 2, 3]), &[0; 16], Some(&orb_data)),
             Err(VerifyError::Mismatch)
         );
         assert_eq!(
-            AnnounceAppId::default().verify(&hash, Some(&orb_data)),
+            verify(AnnounceAppId::default(), &hash, Some(&orb_data)),
             Err(VerifyError::MissingAppData)
         );
     }
