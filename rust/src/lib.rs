@@ -97,14 +97,17 @@ pub mod common {
             MissingAppData,
             #[error("the app announcement did not echo the Orb nonce")]
             OrbNonceMismatch,
+            #[error("iPCP payload below the Orb pairing protocol version")]
+            UnboundIpcpPayload,
         }
 
         impl AnnounceAppId {
-            /// First app protocol version that echoes the Orb nonce.
-            const ORB_NONCE_PROTOCOL_VERSION: u64 = 4;
+            /// First app protocol version that echoes the Orb nonce and may send iPCP.
+            const ORB_PAIRING_PROTOCOL_VERSION: u64 = 4;
 
-            /// Checks `app_data` against the QR `hash`, then that apps from protocol
-            /// v4 echo the nonce of `orb_data`, when the Orb sent one.
+            /// Checks `app_data` against the QR `hash`, that an iPCP payload only comes
+            /// from protocol v4, and that apps from protocol v4 echo the nonce of
+            /// `orb_data`, when the Orb sent one.
             pub fn verify(
                 &self,
                 hash: impl AsRef<[u8]>,
@@ -114,10 +117,15 @@ pub mod common {
                     .as_ref()
                     .ok_or(VerifyError::MissingAppData)?
                     .verify(hash)?;
+                if self.encrypted_ipcp_payload.is_some()
+                    && self.protocol_version < Self::ORB_PAIRING_PROTOCOL_VERSION
+                {
+                    return Err(VerifyError::UnboundIpcpPayload);
+                }
                 match orb_data {
                     Some(orb_data)
                         if self.protocol_version
-                            >= Self::ORB_NONCE_PROTOCOL_VERSION
+                            >= Self::ORB_PAIRING_PROTOCOL_VERSION
                             && self.orb_nonce != orb_data.orb_nonce =>
                     {
                         Err(VerifyError::OrbNonceMismatch)
@@ -275,8 +283,8 @@ pub mod jobs {
 #[cfg(test)]
 mod tests {
     use super::common::v1::{
-        AnnounceAppId, AppAuthenticatedData, HashError, OrbAuthenticatedData,
-        VerifyError,
+        AnnounceAppId, AppAuthenticatedData, HashError, IpcpHpkePayload,
+        OrbAuthenticatedData, VerifyError,
     };
     use blake3::Hasher;
 
@@ -463,6 +471,15 @@ mod tests {
         );
         assert_eq!(announce(4, &[]).verify(&hash, None), Ok(()));
         assert_eq!(announce(3, &[]).verify(&hash, Some(&orb_data)), Ok(()));
+        let with_ipcp = |protocol_version| AnnounceAppId {
+            encrypted_ipcp_payload: Some(IpcpHpkePayload::default()),
+            ..announce(protocol_version, &[1, 2, 3])
+        };
+        assert_eq!(
+            with_ipcp(3).verify(&hash, Some(&orb_data)),
+            Err(VerifyError::UnboundIpcpPayload)
+        );
+        assert_eq!(with_ipcp(4).verify(&hash, Some(&orb_data)), Ok(()));
         assert_eq!(
             announce(4, &[1, 2, 3]).verify([0; 16], Some(&orb_data)),
             Err(VerifyError::Mismatch)
