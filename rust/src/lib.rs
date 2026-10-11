@@ -97,13 +97,13 @@ pub mod common {
             MissingAppData,
             #[error("the app announcement did not echo the Orb nonce")]
             OrbNonceMismatch,
-            #[error("iPCP payload below the Orb nonce protocol version")]
+            #[error("iPCP payload below the Orb pairing protocol version")]
             UnboundIpcpPayload,
         }
 
         impl AnnounceAppId {
-            /// First app protocol version that echoes the Orb nonce.
-            const ORB_NONCE_PROTOCOL_VERSION: u64 = 4;
+            /// First app protocol version that echoes the Orb nonce and may send iPCP.
+            const ORB_PAIRING_PROTOCOL_VERSION: u64 = 4;
 
             /// Checks `app_data` against the QR `hash`, that an iPCP payload only comes
             /// from protocol v4, and that apps from protocol v4 echo the nonce of
@@ -118,14 +118,14 @@ pub mod common {
                     .ok_or(VerifyError::MissingAppData)?
                     .verify(hash)?;
                 if self.encrypted_ipcp_payload.is_some()
-                    && self.protocol_version < Self::ORB_NONCE_PROTOCOL_VERSION
+                    && self.protocol_version < Self::ORB_PAIRING_PROTOCOL_VERSION
                 {
                     return Err(VerifyError::UnboundIpcpPayload);
                 }
                 match orb_data {
                     Some(orb_data)
                         if self.protocol_version
-                            >= Self::ORB_NONCE_PROTOCOL_VERSION
+                            >= Self::ORB_PAIRING_PROTOCOL_VERSION
                             && self.orb_nonce != orb_data.orb_nonce =>
                     {
                         Err(VerifyError::OrbNonceMismatch)
