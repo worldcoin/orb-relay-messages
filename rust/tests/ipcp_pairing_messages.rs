@@ -30,8 +30,6 @@ fn ipcp_pairing_fields_round_trip() {
             ciphertext: vec![16, 17, 18],
         }),
         orb_nonce: vec![4, 5, 6],
-        integrity_token: "integrity-token".into(),
-        integrity_signature: vec![19, 20, 21],
         ..Default::default()
     };
     let pairing_request = PairingRequest {
@@ -130,8 +128,6 @@ fn app_announcement_ignores_removed_hash_field() {
             ciphertext: vec![16, 17, 18],
         }),
         orb_nonce: vec![4, 5, 6],
-        integrity_token: "integrity-token".into(),
-        integrity_signature: vec![19, 20, 21],
         ..Default::default()
     };
     let mut legacy_bytes = expected.encode_to_vec();
@@ -150,8 +146,6 @@ fn app_announcement_ignores_removed_timestamp_field() {
             ciphertext: vec![16, 17, 18],
         }),
         orb_nonce: vec![4, 5, 6],
-        integrity_token: "integrity-token".into(),
-        integrity_signature: vec![19, 20, 21],
         ..Default::default()
     };
     let mut legacy_bytes = expected.encode_to_vec();
@@ -170,16 +164,11 @@ fn app_announcement_preserves_remaining_field_numbers() {
             ciphertext: vec![2, 3],
         }),
         orb_nonce: vec![2],
-        integrity_token: "jwt".into(),
-        integrity_signature: vec![3],
         ..Default::default()
     };
 
     assert_eq!(
         announcement.encode_to_vec(),
-        [
-            0x42, 7, 0x0a, 1, 1, 0x12, 2, 2, 3, 0x52, 1, 2, 0x5a, 3, b'j', b'w', b't',
-            0x62, 1, 3
-        ]
+        [0x42, 7, 0x0a, 1, 1, 0x12, 2, 2, 3, 0x52, 1, 2]
     );
 }
