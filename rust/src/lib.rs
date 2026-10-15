@@ -74,8 +74,8 @@ pub mod common {
         pub enum HashError {
             #[error("version {0} is not the current hash format")]
             WrongVersion(u32),
-            #[error("`device_public_key` must be set")]
-            MissingDevicePublicKey,
+            #[error("HPKE public key must be 32 bytes")]
+            InvalidHpkePublicKey,
         }
 
         /// Why an [`AppAuthenticatedData`] did not verify against a hash.
@@ -85,8 +85,8 @@ pub mod common {
             EmptyHash,
             #[error("no hash format is defined for version {0}")]
             UnsupportedVersion(u32),
-            #[error("unexpected `device_public_key` in pre-v2 hash formats")]
-            UnboundDevicePublicKey,
+            #[error("HPKE public key is not bound by this hash version")]
+            UnboundHpkePublicKey,
             #[error(transparent)]
             Unhashable(#[from] HashError),
             #[error("the data does not match the hash")]
@@ -146,10 +146,10 @@ pub mod common {
                 }
                 let computed = match self.version {
                     Self::VERSION => self.hash(external_hash.len())?,
-                    0 | 1 if !self.device_public_key.is_empty() => {
-                        return Err(VerifyError::UnboundDevicePublicKey)
+                    0 | 1 if !self.hpke_public_key.is_empty() => {
+                        return Err(VerifyError::UnboundHpkePublicKey)
                     }
-                    1 => self.hash_v1(external_hash.len()),
+                    1 => self.versioned_hash(external_hash.len()),
                     0 => self.legacy_hash(external_hash.len()),
                     version => return Err(VerifyError::UnsupportedVersion(version)),
                 };
@@ -160,46 +160,17 @@ pub mod common {
             }
 
             /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
-            ///
-            /// New producers should set `version` to [`Self::VERSION`] and
-            /// `device_public_key` before serializing app data.
             pub fn hash(&self, n: usize) -> Result<Vec<u8>, HashError> {
-                let mut hasher = Hasher::new();
-                let Self {
-                    self_custody_public_key,
-                    identity_commitment,
-                    os,
-                    os_version,
-                    pcp_version,
-                    version,
-                    device_public_key,
-                } = self;
-                if *version != Self::VERSION {
-                    return Err(HashError::WrongVersion(*version));
+                if self.version != Self::VERSION {
+                    return Err(HashError::WrongVersion(self.version));
                 }
-                if device_public_key.is_empty() {
-                    return Err(HashError::MissingDevicePublicKey);
+                if self.hpke_public_key.len() != 32 {
+                    return Err(HashError::InvalidHpkePublicKey);
                 }
-                for v in [
-                    self_custody_public_key,
-                    identity_commitment,
-                    os,
-                    os_version,
-                    device_public_key,
-                ] {
-                    let len = u32::try_from(v.len()).expect("less than u32::MAX");
-                    hasher.update(&len.to_le_bytes());
-                    hasher.update(v.as_bytes());
-                }
-                hasher.update(&pcp_version.to_le_bytes());
-                hasher.update(&version.to_le_bytes());
-                let mut output = vec![0; n];
-                hasher.finalize_xof().fill(&mut output);
-                Ok(output)
+                Ok(self.versioned_hash(n))
             }
 
-            /// v1 length-prefixed BLAKE3 hash (no `device_public_key`).
-            fn hash_v1(&self, n: usize) -> Vec<u8> {
+            fn versioned_hash(&self, n: usize) -> Vec<u8> {
                 let mut hasher = Hasher::new();
                 let Self {
                     self_custody_public_key,
@@ -208,14 +179,19 @@ pub mod common {
                     os_version,
                     pcp_version,
                     version,
-                    device_public_key: _,
+                    hpke_public_key,
                 } = self;
-                assert_eq!(*version, 1, "version != 1");
                 for v in [self_custody_public_key, identity_commitment, os, os_version]
                 {
                     let len = u32::try_from(v.len()).expect("less than u32::MAX");
                     hasher.update(&len.to_le_bytes());
                     hasher.update(v.as_bytes());
+                }
+                if *version == Self::VERSION {
+                    let len = u32::try_from(hpke_public_key.len())
+                        .expect("less than u32::MAX");
+                    hasher.update(&len.to_le_bytes());
+                    hasher.update(hpke_public_key);
                 }
                 hasher.update(&pcp_version.to_le_bytes());
                 hasher.update(&version.to_le_bytes());
@@ -238,7 +214,7 @@ pub mod common {
                     os,
                     pcp_version,
                     version: _,
-                    device_public_key: _,
+                    hpke_public_key: _,
                 } = self;
                 for v in [identity_commitment, self_custody_public_key, os_version, os]
                 {
@@ -294,10 +270,10 @@ mod tests {
             os_version: "18.0".into(),
             pcp_version: 2,
             version,
-            device_public_key: if version >= 2 {
-                "dpk_ghi789".into()
+            hpke_public_key: if version == AppAuthenticatedData::VERSION {
+                vec![7; 32]
             } else {
-                String::new()
+                Vec::new()
             },
         }
     }
@@ -324,7 +300,7 @@ mod tests {
         finish(hasher, n)
     }
 
-    fn v1_hash(data: &AppAuthenticatedData, n: usize) -> Vec<u8> {
+    fn versioned_hash(data: &AppAuthenticatedData, n: usize) -> Vec<u8> {
         let mut hasher = Hasher::new();
         for v in [
             &data.self_custody_public_key,
@@ -336,23 +312,10 @@ mod tests {
             hasher.update(&len.to_le_bytes());
             hasher.update(v.as_bytes());
         }
-        hasher.update(&data.pcp_version.to_le_bytes());
-        hasher.update(&data.version.to_le_bytes());
-        finish(hasher, n)
-    }
-
-    fn current_hash(data: &AppAuthenticatedData, n: usize) -> Vec<u8> {
-        let mut hasher = Hasher::new();
-        for v in [
-            &data.self_custody_public_key,
-            &data.identity_commitment,
-            &data.os,
-            &data.os_version,
-            &data.device_public_key,
-        ] {
-            let len = u32::try_from(v.len()).unwrap();
+        if data.version == AppAuthenticatedData::VERSION {
+            let len = u32::try_from(data.hpke_public_key.len()).unwrap();
             hasher.update(&len.to_le_bytes());
-            hasher.update(v.as_bytes());
+            hasher.update(&data.hpke_public_key);
         }
         hasher.update(&data.pcp_version.to_le_bytes());
         hasher.update(&data.version.to_le_bytes());
@@ -362,7 +325,7 @@ mod tests {
     #[test]
     fn hash_uses_current_format() {
         let data = app_data(AppAuthenticatedData::VERSION);
-        assert_eq!(data.hash(16).unwrap(), current_hash(&data, 16));
+        assert_eq!(data.hash(16).unwrap(), versioned_hash(&data, 16));
         assert_ne!(data.hash(16).unwrap(), legacy_hash(&data, 16));
     }
 
@@ -372,11 +335,12 @@ mod tests {
     }
 
     #[test]
-    fn hash_rejects_missing_device_public_key() {
+    fn hash_binds_self_custody_public_key() {
         let mut data = app_data(AppAuthenticatedData::VERSION);
-        data.device_public_key = String::new();
+        let hash = data.hash(16).unwrap();
+        data.self_custody_public_key = "pk_changed".into();
 
-        assert_eq!(data.hash(16), Err(HashError::MissingDevicePublicKey));
+        assert_ne!(data.hash(16).unwrap(), hash);
     }
 
     #[test]
@@ -407,26 +371,47 @@ mod tests {
         let v1_data = app_data(1);
         let mut v2_data = v1_data.clone();
         v2_data.version = AppAuthenticatedData::VERSION;
-        let hash = v1_hash(&v1_data, 16);
+        let hash = versioned_hash(&v1_data, 16);
 
+        assert_eq!(v1_data.hash(16), Err(HashError::WrongVersion(1)));
         assert_eq!(v1_data.verify(&hash), Ok(()));
         assert!(v2_data.verify(hash).is_err());
     }
 
     #[test]
-    fn verify_rejects_device_public_key_unbound_by_pre_v2_hashes() {
-        for version in [0, 1] {
+    fn verify_rejects_changed_self_custody_public_key() {
+        for version in [0, 1, AppAuthenticatedData::VERSION] {
             let mut data = app_data(version);
-            let hash = if version == 1 {
-                v1_hash(&data, 16)
+            let hash = if version != 0 {
+                versioned_hash(&data, 16)
             } else {
                 legacy_hash(&data, 16)
             };
             assert_eq!(data.verify(&hash), Ok(()));
-            data.device_public_key = "dpk_injected".into();
-            // Pre-v2 hashes ignore the field, so the hash still matches;
-            // verify must reject anyway.
-            assert_eq!(data.verify(hash), Err(VerifyError::UnboundDevicePublicKey),);
+            data.self_custody_public_key = "pk_changed".into();
+            assert_eq!(data.verify(hash), Err(VerifyError::Mismatch));
+        }
+    }
+
+    #[test]
+    fn hpke_public_key_is_bound_to_the_qr_hash() {
+        let mut data = app_data(AppAuthenticatedData::VERSION);
+        let hash = data.hash(16).unwrap();
+        data.hpke_public_key[0] ^= 1;
+        assert_eq!(data.verify(&hash), Err(VerifyError::Mismatch));
+        for length in [0, 31, 33] {
+            data.hpke_public_key = vec![7; length];
+            assert_eq!(data.hash(16), Err(HashError::InvalidHpkePublicKey));
+        }
+        for version in [0, 1] {
+            let mut data = app_data(version);
+            let hash = if version == 0 {
+                legacy_hash(&data, 16)
+            } else {
+                versioned_hash(&data, 16)
+            };
+            data.hpke_public_key = vec![7; 32];
+            assert_eq!(data.verify(hash), Err(VerifyError::UnboundHpkePublicKey));
         }
     }
 

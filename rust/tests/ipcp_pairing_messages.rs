@@ -1,5 +1,8 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, OrbAuthenticatedData},
+    common::v1::{
+        AnnounceAppId, AnnounceOrbId, AppAuthenticatedData, IpcpHpkePayload,
+        OrbAuthenticatedData,
+    },
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -25,6 +28,11 @@ fn ipcp_pairing_fields_round_trip() {
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
+        app_data: Some(AppAuthenticatedData {
+            hpke_public_key: vec![7; 32],
+            version: AppAuthenticatedData::VERSION,
+            ..Default::default()
+        }),
         encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![13, 14, 15],
             ciphertext: vec![16, 17, 18],
@@ -171,4 +179,18 @@ fn app_announcement_preserves_remaining_field_numbers() {
         announcement.encode_to_vec(),
         [0x42, 7, 0x0a, 1, 1, 0x12, 2, 2, 3, 0x52, 1, 2]
     );
+}
+
+#[test]
+fn app_announcement_ignores_removed_integrity_fields() {
+    let expected = AnnounceAppId {
+        orb_nonce: vec![1, 2, 3],
+        ..Default::default()
+    };
+    let mut legacy_bytes = expected.encode_to_vec();
+    legacy_bytes.extend_from_slice(&[0x5a, 3, b'j', b'w', b't', 0x62, 1, 3]);
+
+    let decoded = AnnounceAppId::decode(legacy_bytes.as_slice()).unwrap();
+    assert_eq!(decoded, expected);
+    assert_eq!(decoded.encode_to_vec(), expected.encode_to_vec());
 }
