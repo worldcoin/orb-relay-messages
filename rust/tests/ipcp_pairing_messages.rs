@@ -1,5 +1,8 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, OrbAuthenticatedData},
+    common::v1::{
+        AnnounceAppId, AnnounceOrbId, AppAuthenticatedData, IpcpHpkePayload,
+        OrbAuthenticatedData,
+    },
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -25,6 +28,10 @@ fn ipcp_pairing_fields_round_trip() {
         ..Default::default()
     };
     let app_announcement = AnnounceAppId {
+        app_data: Some(AppAuthenticatedData {
+            ipcp_encryption_public_key: vec![7; 32],
+            ..Default::default()
+        }),
         encrypted_ipcp_payload: Some(IpcpHpkePayload {
             enc: vec![13, 14, 15],
             ciphertext: vec![16, 17, 18],
@@ -45,6 +52,21 @@ fn ipcp_pairing_fields_round_trip() {
 #[test]
 fn pairing_request_rejects_truncated_request_nonce() {
     assert!(PairingRequest::decode([0x22, 0x80].as_slice()).is_err());
+}
+
+#[test]
+fn app_data_ipcp_encryption_key_uses_field_seven() {
+    let app_data = AppAuthenticatedData {
+        ipcp_encryption_public_key: vec![7; 32],
+        ..Default::default()
+    };
+    let mut encoded = vec![0x3a, 32];
+    encoded.extend_from_slice(&[7; 32]);
+    assert_eq!(app_data.encode_to_vec(), encoded);
+    assert_eq!(
+        AppAuthenticatedData::decode(encoded.as_slice()).unwrap(),
+        app_data
+    );
 }
 
 #[test]
