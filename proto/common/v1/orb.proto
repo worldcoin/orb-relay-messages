@@ -95,6 +95,7 @@ message AppAuthenticatedData {
   // from the integrity token, hardware-backed and rotated per `aud`. The orb
   // seals it into the PCP so only this device can download and consume it.
   string device_public_key = 7;
+  bytes ipcp_encryption_public_key = 8;
 }
 
 // HPKE-sealed iPCP. The AEAD aad is the 32-byte AppAuthenticatedData hash, so altering

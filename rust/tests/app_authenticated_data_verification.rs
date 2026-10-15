@@ -15,6 +15,7 @@ fn make_app_data(identity_commitment: &str, pcp_version: u32) -> AppAuthenticate
         os_version: "1.2.3".to_string(),
         version: AppAuthenticatedData::VERSION,
         device_public_key: "dpk_abc123".to_string(),
+        ipcp_encryption_public_key: vec![7; 32],
     }
 }
 

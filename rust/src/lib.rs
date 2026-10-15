@@ -72,10 +72,14 @@ pub mod common {
         /// Why an [`AppAuthenticatedData`] could not be hashed.
         #[derive(Debug, Clone, PartialEq, Eq, Error)]
         pub enum HashError {
-            #[error("version {0} is not the current hash format")]
+            #[error("version {0} is not a supported hash format")]
             WrongVersion(u32),
             #[error("`device_public_key` must be set")]
             MissingDevicePublicKey,
+            #[error("iPCP public key must contain 32 bytes")]
+            InvalidIpcpPublicKey,
+            #[error("iPCP public key requires app data version 3")]
+            UnboundIpcpPublicKey,
         }
 
         /// Why an [`AppAuthenticatedData`] did not verify against a hash.
@@ -97,6 +101,38 @@ pub mod common {
             OrbNonceMismatch,
             #[error("iPCP payload below the Orb pairing protocol version")]
             UnboundIpcpPayload,
+        }
+
+        #[derive(Debug, Clone, PartialEq, Eq, Error)]
+        pub enum OrbValidationError {
+            #[error("unsupported OrbAuthenticatedData version")]
+            UnsupportedVersion,
+            #[error("orb nonce must contain 32 bytes")]
+            InvalidNonce,
+            #[error("pairing request nonce mismatch")]
+            RequestNonceMismatch,
+        }
+
+        impl OrbAuthenticatedData {
+            pub const VERSION: u32 = 1;
+
+            pub fn validate(
+                &self,
+                request_nonce: Option<&[u8; 32]>,
+            ) -> Result<(), OrbValidationError> {
+                if self.version != Self::VERSION {
+                    return Err(OrbValidationError::UnsupportedVersion);
+                }
+                if self.orb_nonce.len() != 32 {
+                    return Err(OrbValidationError::InvalidNonce);
+                }
+                if self.request_nonce.as_slice()
+                    != request_nonce.map_or(&[][..], |nonce| nonce.as_slice())
+                {
+                    return Err(OrbValidationError::RequestNonceMismatch);
+                }
+                Ok(())
+            }
         }
 
         impl AnnounceAppId {
@@ -135,7 +171,7 @@ pub mod common {
 
         impl AppAuthenticatedData {
             /// Current hash format version for new producers.
-            pub const VERSION: u32 = 2;
+            pub const VERSION: u32 = 3;
 
             /// Checks that `hash` matches this [`AppAuthenticatedData`] under
             /// the format selected by `self.version`.
@@ -144,8 +180,13 @@ pub mod common {
                 if external_hash.is_empty() {
                     return Err(VerifyError::EmptyHash);
                 }
+                if self.version < Self::VERSION
+                    && !self.ipcp_encryption_public_key.is_empty()
+                {
+                    return Err(HashError::UnboundIpcpPublicKey.into());
+                }
                 let computed = match self.version {
-                    Self::VERSION => self.hash(external_hash.len())?,
+                    2 | Self::VERSION => self.hash(external_hash.len())?,
                     0 | 1 if !self.device_public_key.is_empty() => {
                         return Err(VerifyError::UnboundDevicePublicKey)
                     }
@@ -159,10 +200,7 @@ pub mod common {
                 Ok(())
             }
 
-            /// Calculates the current length-prefixed BLAKE3 hash of length `n`.
-            ///
-            /// New producers should set `version` to [`Self::VERSION`] and
-            /// `device_public_key` before serializing app data.
+            /// Calculates the v2 or v3 length-prefixed BLAKE3 hash of length `n`.
             pub fn hash(&self, n: usize) -> Result<Vec<u8>, HashError> {
                 let mut hasher = Hasher::new();
                 let Self {
@@ -173,12 +211,19 @@ pub mod common {
                     pcp_version,
                     version,
                     device_public_key,
+                    ipcp_encryption_public_key,
                 } = self;
-                if *version != Self::VERSION {
+                if !matches!(*version, 2 | Self::VERSION) {
                     return Err(HashError::WrongVersion(*version));
                 }
                 if device_public_key.is_empty() {
                     return Err(HashError::MissingDevicePublicKey);
+                }
+                if *version == 2 && !ipcp_encryption_public_key.is_empty() {
+                    return Err(HashError::UnboundIpcpPublicKey);
+                }
+                if *version == Self::VERSION && ipcp_encryption_public_key.len() != 32 {
+                    return Err(HashError::InvalidIpcpPublicKey);
                 }
                 for v in [
                     self_custody_public_key,
@@ -193,6 +238,10 @@ pub mod common {
                 }
                 hasher.update(&pcp_version.to_le_bytes());
                 hasher.update(&version.to_le_bytes());
+                if *version == Self::VERSION {
+                    hasher.update(&32_u32.to_le_bytes());
+                    hasher.update(ipcp_encryption_public_key);
+                }
                 let mut output = vec![0; n];
                 hasher.finalize_xof().fill(&mut output);
                 Ok(output)
@@ -209,6 +258,7 @@ pub mod common {
                     pcp_version,
                     version,
                     device_public_key: _,
+                    ipcp_encryption_public_key: _,
                 } = self;
                 assert_eq!(*version, 1, "version != 1");
                 for v in [self_custody_public_key, identity_commitment, os, os_version]
@@ -239,6 +289,7 @@ pub mod common {
                     pcp_version,
                     version: _,
                     device_public_key: _,
+                    ipcp_encryption_public_key: _,
                 } = self;
                 for v in [identity_commitment, self_custody_public_key, os_version, os]
                 {
@@ -299,6 +350,11 @@ mod tests {
             } else {
                 String::new()
             },
+            ipcp_encryption_public_key: if version == AppAuthenticatedData::VERSION {
+                vec![7; 32]
+            } else {
+                Vec::new()
+            },
         }
     }
 
@@ -356,6 +412,10 @@ mod tests {
         }
         hasher.update(&data.pcp_version.to_le_bytes());
         hasher.update(&data.version.to_le_bytes());
+        if data.version == AppAuthenticatedData::VERSION {
+            hasher.update(&32_u32.to_le_bytes());
+            hasher.update(&data.ipcp_encryption_public_key);
+        }
         finish(hasher, n)
     }
 
@@ -372,8 +432,41 @@ mod tests {
     }
 
     #[test]
+    fn v2_hash_is_unchanged_and_rejects_an_unbound_ipcp_key() {
+        let mut data = app_data(2);
+        let hash = current_hash(&data, 32);
+        assert_eq!(data.hash(32).unwrap(), hash);
+        assert_eq!(data.verify(&hash), Ok(()));
+        data.ipcp_encryption_public_key = vec![7; 32];
+        assert_eq!(data.hash(32), Err(HashError::UnboundIpcpPublicKey));
+        assert_eq!(
+            data.verify(hash),
+            Err(VerifyError::Unhashable(HashError::UnboundIpcpPublicKey))
+        );
+    }
+
+    #[test]
+    fn v3_hash_binds_both_keys_and_requires_a_sender_key() {
+        let data = app_data(AppAuthenticatedData::VERSION);
+        let hash = data.hash(32).unwrap();
+        let mut changed = data.clone();
+        changed.device_public_key.push('x');
+        assert_eq!(changed.verify(&hash), Err(VerifyError::Mismatch));
+        changed = data.clone();
+        changed.ipcp_encryption_public_key[0] ^= 1;
+        assert_eq!(changed.verify(&hash), Err(VerifyError::Mismatch));
+        for length in [0, 31, 33] {
+            changed.ipcp_encryption_public_key = vec![7; length];
+            assert_eq!(changed.hash(32), Err(HashError::InvalidIpcpPublicKey));
+        }
+        changed = data;
+        changed.device_public_key.clear();
+        assert_eq!(changed.hash(32), Err(HashError::MissingDevicePublicKey));
+    }
+
+    #[test]
     fn hash_rejects_missing_device_public_key() {
-        let mut data = app_data(AppAuthenticatedData::VERSION);
+        let mut data = app_data(2);
         data.device_public_key = String::new();
 
         assert_eq!(data.hash(16), Err(HashError::MissingDevicePublicKey));
