@@ -1,5 +1,8 @@
 use orb_relay_messages::{
-    common::v1::{AnnounceAppId, AnnounceOrbId, IpcpHpkePayload, OrbAuthenticatedData},
+    common::v1::{
+        AnnounceAppId, AnnounceOrbId, AppAuthenticatedData, IpcpHpkePayload,
+        OrbAuthenticatedData, OrbValidationError,
+    },
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
@@ -170,5 +173,59 @@ fn app_announcement_preserves_remaining_field_numbers() {
     assert_eq!(
         announcement.encode_to_vec(),
         [0x42, 7, 0x0a, 1, 1, 0x12, 2, 2, 3, 0x52, 1, 2]
+    );
+}
+
+#[test]
+fn app_keys_keep_distinct_wire_fields() {
+    let data = AppAuthenticatedData {
+        device_public_key: "device".into(),
+        ipcp_encryption_public_key: vec![0xff; 32],
+        ..Default::default()
+    };
+    let encoded = data.encode_to_vec();
+    assert_eq!(
+        &encoded[..8],
+        &[0x3a, 6, b'd', b'e', b'v', b'i', b'c', b'e']
+    );
+    assert_eq!(&encoded[8..10], &[0x42, 32]);
+    assert_eq!(round_trip(data.clone()), data);
+}
+
+#[test]
+fn orb_validation_binds_version_and_both_nonces() {
+    let request_nonce = [3; 32];
+    let mut data = OrbAuthenticatedData {
+        version: OrbAuthenticatedData::VERSION,
+        orb_nonce: vec![7; 32],
+        ..Default::default()
+    };
+    assert_eq!(data.validate(None), Ok(()));
+    assert_eq!(
+        data.validate(Some(&request_nonce)),
+        Err(OrbValidationError::RequestNonceMismatch)
+    );
+    data.request_nonce = request_nonce.to_vec();
+    assert_eq!(data.validate(Some(&request_nonce)), Ok(()));
+    assert_eq!(
+        data.validate(None),
+        Err(OrbValidationError::RequestNonceMismatch)
+    );
+    assert_eq!(
+        data.validate(Some(&[4; 32])),
+        Err(OrbValidationError::RequestNonceMismatch)
+    );
+    data.request_nonce.pop();
+    assert_eq!(
+        data.validate(Some(&request_nonce)),
+        Err(OrbValidationError::RequestNonceMismatch)
+    );
+    data.request_nonce.clear();
+    data.orb_nonce.pop();
+    assert_eq!(data.validate(None), Err(OrbValidationError::InvalidNonce));
+    data.version += 1;
+    assert_eq!(
+        data.validate(None),
+        Err(OrbValidationError::UnsupportedVersion)
     );
 }
