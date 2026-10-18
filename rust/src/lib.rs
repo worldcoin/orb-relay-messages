@@ -99,6 +99,47 @@ pub mod common {
             UnboundIpcpPayload,
         }
 
+        /// Why an [`OrbAuthenticatedData`] is not valid.
+        #[derive(Debug, Clone, PartialEq, Eq, Error)]
+        pub enum OrbValidationError {
+            #[error("unsupported OrbAuthenticatedData version")]
+            UnsupportedVersion,
+            #[error("orb nonce must contain 32 bytes")]
+            InvalidOrbNonce,
+            #[error("pairing request nonce mismatch")]
+            RequestNonceMismatch,
+            #[error("unexpected request nonce outside scan-to-pair")]
+            UnexpectedRequestNonce,
+        }
+
+        impl OrbAuthenticatedData {
+            /// Current format version for new producers.
+            pub const VERSION: u32 = 1;
+
+            /// Checks the version and the Orb nonce, and that the Orb echoes
+            /// `request_nonce` for scan-to-pair (`Some`) or sends none otherwise.
+            pub fn validate(
+                &self,
+                request_nonce: Option<[u8; 32]>,
+            ) -> Result<(), OrbValidationError> {
+                if self.version != Self::VERSION {
+                    return Err(OrbValidationError::UnsupportedVersion);
+                }
+                if self.orb_nonce.len() != 32 {
+                    return Err(OrbValidationError::InvalidOrbNonce);
+                }
+                match request_nonce {
+                    Some(nonce) if self.request_nonce != nonce => {
+                        Err(OrbValidationError::RequestNonceMismatch)
+                    }
+                    None if !self.request_nonce.is_empty() => {
+                        Err(OrbValidationError::UnexpectedRequestNonce)
+                    }
+                    _ => Ok(()),
+                }
+            }
+        }
+
         impl AnnounceAppId {
             /// First app protocol version that echoes the Orb nonce and may send iPCP.
             const ORB_PAIRING_PROTOCOL_VERSION: u64 = 4;
