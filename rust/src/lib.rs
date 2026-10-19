@@ -35,6 +35,8 @@ pub mod common {
         tonic::include_proto!("common.v1");
 
         use blake3::Hasher;
+        use p256::ecdsa::{signature::Verifier as _, Signature, VerifyingKey};
+        use prost::Message as _;
         use thiserror::Error;
 
         impl std::fmt::Display for AnnounceAppId {
@@ -69,6 +71,9 @@ pub mod common {
         /// Default PCP version value.
         const PCP_VERSION_DEFAULT: u32 = 2;
 
+        pub const ORB_DATA_SIGNATURE_DOMAIN: &[u8] =
+            b"orb-authenticated-data-signature";
+
         /// Why an [`AppAuthenticatedData`] could not be hashed.
         #[derive(Debug, Clone, PartialEq, Eq, Error)]
         pub enum HashError {
@@ -99,9 +104,11 @@ pub mod common {
             UnboundIpcpPayload,
         }
 
-        /// Why an [`OrbAuthenticatedData`] is not valid.
+        /// Why an Orb announcement is not valid.
         #[derive(Debug, Clone, PartialEq, Eq, Error)]
         pub enum OrbValidationError {
+            #[error("invalid SE050 signature")]
+            InvalidSignature,
             #[error("unsupported OrbAuthenticatedData version")]
             UnsupportedVersion,
             #[error("orb nonce must contain 32 bytes")]
@@ -116,12 +123,17 @@ pub mod common {
             /// Current format version for new producers.
             pub const VERSION: u32 = 1;
 
-            /// Checks the version and the Orb nonce, and that the Orb echoes
-            /// `request_nonce` for scan-to-pair (`Some`) or sends none otherwise.
-            pub fn validate(
+            pub fn verify(
                 &self,
+                attestation_key: &VerifyingKey,
+                signature: &Signature,
                 request_nonce: Option<[u8; 32]>,
             ) -> Result<(), OrbValidationError> {
+                let signed_data =
+                    [ORB_DATA_SIGNATURE_DOMAIN, &self.encode_to_vec()].concat();
+                attestation_key
+                    .verify(&signed_data, signature)
+                    .map_err(|_| OrbValidationError::InvalidSignature)?;
                 if self.version != Self::VERSION {
                     return Err(OrbValidationError::UnsupportedVersion);
                 }
@@ -142,7 +154,7 @@ pub mod common {
 
         impl AnnounceAppId {
             /// First app protocol version that echoes the Orb nonce and may send iPCP.
-            const ORB_PAIRING_PROTOCOL_VERSION: u64 = 4;
+            pub const ORB_PAIRING_PROTOCOL_VERSION: u64 = 4;
 
             /// Checks `app_data` against the QR `hash`, that an iPCP payload only comes
             /// from protocol v4, and that apps from protocol v4 echo the nonce of
