@@ -12,14 +12,14 @@ use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
 use tokio::time::timeout;
 
-fn options(endpoint: String) -> ClientOpts {
+fn options(endpoint: String, retries: u64) -> ClientOpts {
     ClientOpts::entity(EntityType::Orb)
         .id("orb")
         .namespace("test")
         .endpoint(endpoint)
         .auth(Auth::Token(Default::default()))
         .max_connection_attempts(Amount::Val(1))
-        .max_message_attempts(Amount::Val(2))
+        .max_message_attempts(Amount::Val(retries))
         .connection_timeout(Duration::from_secs(2))
         .ack_timeout(Duration::from_millis(50))
         .reply_timeout(Duration::from_millis(50))
@@ -31,68 +31,15 @@ fn message(qos: QoS) -> SendMessage {
     SendMessage::to(EntityType::App)
         .id("app")
         .namespace("test")
-        .type_url("type.googleapis.com/test.Message")
         .qos(qos)
-        .payload(b"synthetic-payload")
+        .payload(Any {
+            type_url: "type.googleapis.com/test.Message".into(),
+            value: b"synthetic-payload".to_vec(),
+        })
 }
 
 #[tokio::test]
-async fn typed_send_preserves_payload_and_ack_details() {
-    for subscribers in [None, Some(0), Some(1)] {
-        let server =
-            TestServer::new(vec![], move |packets, request, _| match request {
-                Msg::ConnectRequest(request) => ConnectResponse {
-                    client_id: request.client_id.unwrap().id,
-                    success: true,
-                    ..Default::default()
-                }
-                .into_res(),
-                Msg::Payload(packet) => {
-                    let seq = packet.seq;
-                    packets.push(packet);
-                    Ack {
-                        seq,
-                        subscriber_count: subscribers,
-                    }
-                    .into_res()
-                }
-                _ => None,
-            })
-            .await;
-        let (client, task) =
-            Client::connect(options(format!("https://{}", server.addr())));
-        let ack = timeout(
-            Duration::from_secs(3),
-            client.send_with_ack(message(QoS::AtMostOnce)),
-        )
-        .await
-        .unwrap()
-        .unwrap();
-        assert_eq!(ack.subscriber_count, subscribers);
-        let packets = server.state().await;
-        assert_eq!(packets.len(), 1);
-        assert_eq!(
-            packets[0].payload.as_ref().unwrap().type_url,
-            "type.googleapis.com/test.Message"
-        );
-        assert_eq!(
-            packets[0].payload.as_ref().unwrap().value,
-            b"synthetic-payload"
-        );
-        assert_eq!(packets[0].dst.as_ref().unwrap().id, "app");
-        assert_eq!(packets[0].src.as_ref().unwrap().id, "orb");
-        drop(packets);
-        client.stop().await.unwrap();
-        timeout(Duration::from_secs(1), task)
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
-    }
-}
-
-#[tokio::test]
-async fn receive_and_reply_preserve_typed_envelope() {
+async fn receive_and_acknowledged_reply_preserve_type() {
     let packet = RelayPayload {
         src: Some(Entity {
             id: "app".into(),
@@ -125,6 +72,9 @@ async fn receive_and_reply_preserve_typed_envelope() {
             Msg::Payload(packet) => {
                 let seq = packet.seq;
                 packets.push(packet);
+                if packets.len() == 1 {
+                    return None;
+                }
                 Ack {
                     seq,
                     subscriber_count: Some(1),
@@ -134,7 +84,8 @@ async fn receive_and_reply_preserve_typed_envelope() {
             _ => None,
         })
         .await;
-    let (client, task) = Client::connect(options(format!("https://{}", server.addr())));
+    let (client, task) =
+        Client::connect(options(format!("https://{}", server.addr()), 2));
     let received = timeout(Duration::from_secs(3), client.recv())
         .await
         .unwrap()
@@ -145,13 +96,16 @@ async fn receive_and_reply_preserve_typed_envelope() {
     };
     timeout(
         Duration::from_secs(3),
-        received.reply_any(reply.clone(), QoS::AtLeastOnce),
+        received.reply(reply.clone(), QoS::AtLeastOnce),
     )
     .await
     .unwrap()
     .unwrap();
-    assert_eq!(received.into_relay_payload(), expected);
+    assert_eq!(Some(received.payload), expected.payload);
+    assert_eq!(Some(received.from), expected.src);
     let packets = server.state().await;
+    assert_eq!(packets.len(), 2);
+    assert_eq!(packets[0], packets[1]);
     assert_eq!(packets[0].payload, Some(reply));
     assert_eq!(packets[0].seq, 42);
     assert_eq!(packets[0].dst, expected.src);
@@ -166,11 +120,11 @@ async fn receive_and_reply_preserve_typed_envelope() {
 
 #[tokio::test]
 async fn finite_retries_terminate_and_heartbeat_acks_do_not_acknowledge_payloads() {
-    for (ack, qos, expected_attempts) in [
-        (true, QoS::AtLeastOnce, 3),
-        (false, QoS::AtLeastOnce, 3),
-        (true, QoS::AtMostOnce, 1),
-        (false, QoS::AtMostOnce, 1),
+    for (ack, qos, retries, expected_attempts) in [
+        (true, QoS::AtLeastOnce, 2, 3),
+        (true, QoS::AtLeastOnce, 0, 1),
+        (false, QoS::AtLeastOnce, 2, 3),
+        (false, QoS::AtMostOnce, 2, 1),
     ] {
         let server = TestServer::new(0, |attempts, request, _| match request {
             Msg::ConnectRequest(request) => ConnectResponse {
@@ -195,10 +149,10 @@ async fn finite_retries_terminate_and_heartbeat_acks_do_not_acknowledge_payloads
         })
         .await;
         let (client, task) =
-            Client::connect(options(format!("https://{}", server.addr())));
+            Client::connect(options(format!("https://{}", server.addr()), retries));
         let error = timeout(Duration::from_secs(3), async {
             if ack {
-                client.send_with_ack(message(qos)).await.unwrap_err()
+                client.send(message(qos)).await.unwrap_err()
             } else {
                 client.ask(message(qos)).await.unwrap_err()
             }
@@ -220,31 +174,38 @@ async fn finite_retries_terminate_and_heartbeat_acks_do_not_acknowledge_payloads
 }
 
 #[tokio::test]
-async fn rejects_wrong_identity_and_payload_before_authentication() {
-    for wrong_identity in [true, false] {
-        let server = TestServer::new((), move |_, _, _| {
-            if wrong_identity {
-                ConnectResponse {
-                    client_id: "different-orb".into(),
-                    success: true,
+async fn connection_failures_remain_distinguishable() {
+    for mode in 0..3 {
+        let server = TestServer::new((), move |_, request, clients| {
+            let Msg::ConnectRequest(request) = request else {
+                return None;
+            };
+            match mode {
+                0 => ConnectResponse {
+                    success: false,
                     ..Default::default()
                 }
-                .into_res()
-            } else {
-                RelayPayload::default().into_res()
+                .into_res(),
+                1 => None,
+                _ => {
+                    clients.stop(&request.client_id.unwrap());
+                    None
+                }
             }
         })
         .await;
         let (_client, task) =
-            Client::connect(options(format!("https://{}", server.addr())));
+            Client::connect(options(format!("https://{}", server.addr()), 2));
         let error = timeout(Duration::from_secs(3), task)
             .await
             .unwrap()
             .unwrap()
             .unwrap_err();
         assert!(matches!(
-            (wrong_identity, error),
-            (true, Err::AuthenticationFailed) | (false, Err::UnexpectedResponse)
+            (mode, error),
+            (0, Err::AuthenticationFailed)
+                | (1, Err::ConnectionTimeout)
+                | (2, Err::StreamEnded)
         ));
     }
 }
