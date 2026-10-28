@@ -1,7 +1,10 @@
 #![cfg(feature = "testing")]
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, SendMessage};
-use orb_relay_messages::relay::{
-    entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
+use orb_relay_messages::{
+    prost_types::Any,
+    relay::{
+        entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
+    },
 };
 use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
@@ -47,7 +50,10 @@ async fn it_stops_sever_when_stop_is_called() {
             SendMessage::to(EntityType::App)
                 .id("foo")
                 .namespace("bar")
-                .payload(b"foobar"),
+                .payload(Any {
+                    type_url: String::default(),
+                    value: b"foobar".to_vec(),
+                }),
         )
         .await
         .unwrap();
