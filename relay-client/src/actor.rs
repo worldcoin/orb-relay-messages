@@ -197,7 +197,7 @@ fn handle_msg(
         })) => {
             let recv_msg = RecvdRelayPayload {
                 from: entity,
-                payload: payload.value,
+                payload,
                 seq,
             };
             handle_payload(state, recv_msg, seq, &props.client_tx)?;

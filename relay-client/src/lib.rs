@@ -31,21 +31,19 @@ pub type Seq = u64;
 ///     .id("device_123")
 ///     .namespace("default")
 ///     .qos(QoS::AtLeastOnce) // Optional, defaults to AtMostOnce
-///     .payload(b"hello");
+///     .payload(Any::from_msg(&msg)?);
 ///
 /// client.send(msg).await.unwrap();
 /// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
-#[builder(on(Vec<u8>, into))]
-#[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
 #[builder(finish_fn = payload)]
 pub struct SendMessage {
     #[builder(start_fn)]
     target_type: EntityType,
     #[builder(finish_fn)]
-    data: Vec<u8>,
+    data: Any,
     #[builder(setters(name = id))]
     target_id: String,
     #[builder(setters(name = namespace))]
@@ -82,14 +80,14 @@ pub enum QoS {
 
 pub(crate) struct RecvdRelayPayload {
     pub from: Entity,
-    pub payload: Vec<u8>,
+    pub payload: Any,
     pub seq: Seq,
 }
 
 #[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
-    pub payload: Vec<u8>,
+    pub payload: Any,
     client: Client,
     seq: Seq,
 }
@@ -101,20 +99,15 @@ impl RecvMessage {
     /// ```ignore
     /// async fn handle_message(client: &Client) {
     ///     while let Ok(msg) = client.recv().await {
-    ///         // Reply with "hello" using at-most-once delivery
-    ///         msg.reply(b"hello", QoS::AtMostOnce).await.unwrap();
+    ///         // Reply using at-most-once delivery
+    ///         msg.reply(Any::from_msg(&ack)?, QoS::AtMostOnce).await.unwrap();
     ///
-    ///         // Reply with bytes using at-least-once delivery
-    ///         msg.reply(vec![1, 2, 3], QoS::AtLeastOnce).await.unwrap();
+    ///         // Reply using at-least-once delivery
+    ///         msg.reply(Any::from_msg(&ack)?, QoS::AtLeastOnce).await.unwrap();
     ///     }
     /// }
     /// ```
-    pub async fn reply(
-        &self,
-        payload: impl Into<Vec<u8>>,
-        qos: QoS,
-    ) -> Result<(), Err> {
-        let payload = payload.into();
+    pub async fn reply(&self, payload: Any, qos: QoS) -> Result<(), Err> {
         let relay_payload = RelayPayload {
             src: Some(Entity {
                 id: self.client.opts.client_id.clone(),
@@ -127,10 +120,7 @@ impl RecvMessage {
                 namespace: self.from.namespace.clone(),
             }),
             seq: self.seq,
-            payload: Some(Any {
-                type_url: "".to_string(),
-                value: payload.clone(),
-            }),
+            payload: Some(payload.clone()),
         };
 
         self.client
@@ -369,7 +359,7 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtMostOnce)
-    ///         .payload(b"hello")
+    ///         .payload(Any::from_msg(&msg)?)
     /// ).await?;
     ///
     /// // Send with at-least-once delivery (waits for ack)
@@ -378,7 +368,7 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtLeastOnce)
-    ///         .payload(vec![1,2,3])
+    ///         .payload(Any::from_msg(&msg)?)
     /// ).await?;
     /// ```
     pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
@@ -420,12 +410,12 @@ impl Client {
     ///     SendMessage::to(EntityType::Orb)
     ///         .id("device_1")
     ///         .namespace("default")
-    ///         .payload("what is your status?")
+    ///         .payload(Any::from_msg(&status_request)?)
     /// ).await?;
     ///
     /// println!("Got response: {:?}", response);
     /// ```
-    pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
+    pub async fn ask(&self, msg: SendMessage) -> Result<Any, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let payload = relay_payload(&self.opts, &msg, seq);
 
@@ -469,9 +459,6 @@ pub(crate) fn relay_payload(
             namespace: msg.target_namespace.clone(),
         }),
         seq,
-        payload: Some(Any {
-            type_url: "".to_string(),
-            value: msg.data.clone(),
-        }),
+        payload: Some(msg.data.clone()),
     }
 }
