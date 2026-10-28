@@ -7,7 +7,8 @@ use http::{uri::Scheme, Uri};
 use orb_relay_messages::relay::{
     connect_request::AuthMethod, entity::EntityType, relay_connect_request,
     relay_connect_response, relay_service_client::RelayServiceClient, Ack,
-    ConnectRequest, Entity, RelayConnectRequest, RelayConnectResponse, RelayPayload,
+    ConnectRequest, ConnectResponse, Entity, RelayConnectRequest, RelayConnectResponse,
+    RelayPayload,
 };
 use secrecy::ExposeSecret;
 use std::collections::HashMap;
@@ -15,7 +16,7 @@ use tokio::{task, time};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 use tonic::{metadata::MetadataValue, transport::Endpoint, Request, Streaming};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 const X_CLIENT_ID_HEADER: &str = "x-client-id";
 const X_DEVICE_TYPE_HEADER: &str = "x-device-type";
@@ -33,7 +34,7 @@ type ReplySender = flume::Sender<Result<RecvdRelayPayload, Err>>;
 
 #[derive(Default)]
 pub struct State {
-    pending_acks: HashMap<Seq, (SendMessage, flume::Sender<Result<Ack, Err>>)>,
+    pending_acks: HashMap<Seq, (SendMessage, flume::Sender<Result<(), Err>>)>,
     pending_replies: HashMap<(ClientId, Seq), (SendMessage, ReplySender)>,
     heartbeat_started: bool,
 }
@@ -53,7 +54,7 @@ pub(crate) enum Msg {
 
     WaitForAck {
         original_msg: SendMessage,
-        ack_tx: flume::Sender<Result<Ack, Err>>,
+        ack_tx: flume::Sender<Result<(), Err>>,
         seq: Seq,
     },
 
@@ -144,7 +145,7 @@ async fn main_loop(
 ) -> Result<(), Err> {
     let mut response_stream = time::timeout(
         props.opts.connection_timeout,
-        connect(props, cancellation_token),
+        connect(props, &relay_actor_tx, cancellation_token),
     )
     .await
     .map_err(|_| Err::ConnectionTimeout)??;
@@ -193,24 +194,22 @@ fn handle_msg(
         Msg::RelayResponse(relay_connect_response::Msg::Payload(RelayPayload {
             payload: Some(payload),
             src: Some(entity),
-            dst,
             seq,
+            ..
         })) => {
             let recv_msg = RecvdRelayPayload {
                 from: entity,
-                payload: payload.value,
-                type_url: payload.type_url,
-                to: dst,
+                payload,
                 seq,
             };
             handle_payload(state, recv_msg, seq, &props.client_tx)?;
         }
 
-        Msg::RelayResponse(relay_connect_response::Msg::Ack(ack)) => {
-            handle_ack(state, ack)
+        Msg::RelayResponse(relay_connect_response::Msg::Ack(Ack { seq, .. })) => {
+            handle_ack(state, seq)
         }
 
-        Msg::RelayResponse(_) => return Err(Err::UnexpectedResponse),
+        Msg::RelayResponse(_) => debug!("Ignoring unexpected relay response"),
 
         Msg::Send(payload) => {
             props
@@ -229,10 +228,7 @@ fn handle_msg(
             seq,
         } => {
             let payload = relay_payload(&props.opts, &original_msg, seq);
-            let retries_left = match original_msg.qos {
-                QoS::AtMostOnce => Amount::Val(0),
-                QoS::AtLeastOnce => props.opts.max_message_attempts,
-            };
+            let retries_left = props.opts.max_message_attempts;
             state.pending_acks.insert(seq, (original_msg, ack_tx));
             props
                 .tonic_tx
@@ -394,14 +390,15 @@ fn handle_payload(
     Ok(())
 }
 
-fn handle_ack(state: &mut State, ack: Ack) {
-    if let Some((_pending_msg, ack_tx)) = state.pending_acks.remove(&ack.seq) {
-        let _ = ack_tx.send(Ok(ack));
+fn handle_ack(state: &mut State, seq: Seq) {
+    if let Some((_pending_msg, ack_tx)) = state.pending_acks.remove(&seq) {
+        let _ = ack_tx.send(Ok(()));
     };
 }
 
 async fn connect(
     props: &Props,
+    relay_actor_tx: &flume::Sender<Msg>,
     cancellation_token: CancellationToken,
 ) -> Result<Streaming<RelayConnectResponse>, Err> {
     let Props {
@@ -447,8 +444,7 @@ async fn connect(
             req.metadata_mut()
                 .insert(X_DEVICE_TYPE_HEADER, device_type_value.clone());
             Ok(req)
-        })
-        .max_decoding_message_size(opts.max_decoding_message_size);
+        });
 
     tonic_tx
         .send(RelayConnectRequest {
@@ -476,16 +472,25 @@ async fn connect(
         .await?
         .into_inner();
 
-    match response_stream.next().await.ok_or(Err::StreamEnded)??.msg {
-        Some(relay_connect_response::Msg::ConnectResponse(response))
-            if response.success && response.client_id == *client_id =>
-        {
-            info!("Connection established successfully.");
+    loop {
+        match response_stream.next().await.ok_or(Err::StreamEnded)??.msg {
+            Some(relay_connect_response::Msg::ConnectResponse(ConnectResponse {
+                success: true,
+                ..
+            })) => {
+                info!("Connection established successfully.");
+                break;
+            }
+            Some(relay_connect_response::Msg::ConnectResponse(_)) => {
+                return Err(Err::AuthenticationFailed);
+            }
+            Some(msg) => {
+                relay_actor_tx
+                    .send(Msg::RelayResponse(msg))
+                    .wrap_err("relay_actor_tx receivers unexpectedly dropped")?;
+            }
+            None => (),
         }
-        Some(relay_connect_response::Msg::ConnectResponse(_)) => {
-            return Err(Err::AuthenticationFailed);
-        }
-        _ => return Err(Err::UnexpectedResponse),
     }
 
     Ok(response_stream)

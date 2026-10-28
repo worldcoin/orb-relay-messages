@@ -2,7 +2,7 @@ use bon::Builder;
 use color_eyre::eyre::{self, Context};
 use derive_more::From;
 use orb_relay_messages::prost_types::Any;
-use orb_relay_messages::relay::{entity::EntityType, Ack, Entity, RelayPayload};
+use orb_relay_messages::relay::{entity::EntityType, Entity, RelayPayload};
 use secrecy::SecretString;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -31,24 +31,19 @@ pub type Seq = u64;
 ///     .id("device_123")
 ///     .namespace("default")
 ///     .qos(QoS::AtLeastOnce) // Optional, defaults to AtMostOnce
-///     .payload(b"hello");
+///     .payload(Any::from_msg(&message)?);
 ///
 /// client.send(msg).await.unwrap();
 /// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
-#[builder(on(Vec<u8>, into))]
-#[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
 #[builder(finish_fn = payload)]
 pub struct SendMessage {
     #[builder(start_fn)]
     target_type: EntityType,
     #[builder(finish_fn)]
-    data: Vec<u8>,
-    /// Protobuf Any type URL; empty for untyped byte messages.
-    #[builder(default)]
-    type_url: String,
+    data: Any,
     #[builder(setters(name = id))]
     target_id: String,
     #[builder(setters(name = namespace))]
@@ -85,67 +80,34 @@ pub enum QoS {
 
 pub(crate) struct RecvdRelayPayload {
     pub from: Entity,
-    pub payload: Vec<u8>,
-    pub type_url: String,
-    pub to: Option<Entity>,
+    pub payload: Any,
     pub seq: Seq,
 }
 
 #[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
-    pub payload: Vec<u8>,
-    pub type_url: String,
-    pub to: Option<Entity>,
+    pub payload: Any,
     client: Client,
     seq: Seq,
 }
 
 impl RecvMessage {
-    /// Recover the complete relay envelope for typed decoding and route validation.
-    pub fn into_relay_payload(self) -> RelayPayload {
-        RelayPayload {
-            src: Some(self.from),
-            dst: self.to,
-            seq: self.seq,
-            payload: Some(Any {
-                type_url: self.type_url,
-                value: self.payload,
-            }),
-        }
-    }
-
     /// Reply to the sender of this message with a payload and specified QoS level.
     ///
     /// # Example
     /// ```ignore
     /// async fn handle_message(client: &Client) {
     ///     while let Ok(msg) = client.recv().await {
-    ///         // Reply with "hello" using at-most-once delivery
-    ///         msg.reply(b"hello", QoS::AtMostOnce).await.unwrap();
+    ///         // Reply using at-most-once delivery
+    ///         msg.reply(Any::from_msg(&response)?, QoS::AtMostOnce).await.unwrap();
     ///
-    ///         // Reply with bytes using at-least-once delivery
-    ///         msg.reply(vec![1, 2, 3], QoS::AtLeastOnce).await.unwrap();
+    ///         // Reply using at-least-once delivery
+    ///         msg.reply(Any::from_msg(&response)?, QoS::AtLeastOnce).await.unwrap();
     ///     }
     /// }
     /// ```
-    pub async fn reply(
-        &self,
-        payload: impl Into<Vec<u8>>,
-        qos: QoS,
-    ) -> Result<(), Err> {
-        self.reply_any(
-            Any {
-                type_url: String::new(),
-                value: payload.into(),
-            },
-            qos,
-        )
-        .await
-    }
-
-    /// Reply with a typed Protobuf payload, preserving its type URL on retries.
-    pub async fn reply_any(&self, payload: Any, qos: QoS) -> Result<(), Err> {
+    pub async fn reply(&self, payload: Any, qos: QoS) -> Result<(), Err> {
         let relay_payload = RelayPayload {
             src: Some(Entity {
                 id: self.client.opts.client_id.clone(),
@@ -170,8 +132,7 @@ impl RecvMessage {
                     original_msg: SendMessage {
                         target_type: EntityType::try_from(self.from.entity_type)
                             .wrap_err("Failed to convert EntityType")?,
-                        data: payload.value,
-                        type_url: payload.type_url,
+                        data: payload,
                         target_id: self.from.id.clone(),
                         target_namespace: self.from.namespace.clone(),
                         qos,
@@ -202,7 +163,6 @@ pub enum Err {
     ReplyTimeout,
     ConnectionTimeout,
     AuthenticationFailed,
-    UnexpectedResponse,
     StopRequest,
     ReconnectRequest,
     StreamEnded,
@@ -291,8 +251,6 @@ pub struct ClientOpts {
     keep_alive_interval: Duration,
     #[builder(default = Duration::from_secs(10))]
     keep_alive_timeout: Duration,
-    #[builder(default = 4 * 1024 * 1024)]
-    max_decoding_message_size: usize,
 }
 
 impl Client {
@@ -390,8 +348,6 @@ impl Client {
         Ok(RecvMessage {
             from: msg.from,
             payload: msg.payload,
-            type_url: msg.type_url,
-            to: msg.to,
             client: self.clone(),
             seq: msg.seq,
         })
@@ -408,7 +364,7 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtMostOnce)
-    ///         .payload(b"hello")
+    ///         .payload(Any::from_msg(&message)?)
     /// ).await?;
     ///
     /// // Send with at-least-once delivery (waits for ack)
@@ -417,39 +373,31 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtLeastOnce)
-    ///         .payload(vec![1,2,3])
+    ///         .payload(Any::from_msg(&message)?)
     /// ).await?;
     /// ```
     pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
+        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         if let QoS::AtLeastOnce = msg.qos {
-            self.send_with_ack(msg).await?;
+            let (ack_tx, ack_rx) = flume::unbounded();
+            self.actor_tx
+                .send(actor::Msg::WaitForAck {
+                    original_msg: msg,
+                    ack_tx,
+                    seq,
+                })
+                .wrap_err("Error reaching actor loop")?;
+            ack_rx
+                .recv_async()
+                .await
+                .wrap_err("Error when waiting for ack")??;
         } else {
-            let seq = self.seq.fetch_add(1, Ordering::SeqCst);
             let payload = relay_payload(&self.opts, &msg, seq);
             self.actor_tx
                 .send(actor::Msg::Send(payload.into()))
                 .wrap_err("Error reaching actor loop")?;
         }
         Ok(())
-    }
-
-    /// Wait for the relay ACK, including its subscriber count.
-    /// This does not confirm receipt by the destination application.
-    /// AtMostOnce waits for an ACK but never retransmits the message.
-    pub async fn send_with_ack(&self, msg: SendMessage) -> Result<Ack, Err> {
-        let seq = self.seq.fetch_add(1, Ordering::SeqCst);
-        let (ack_tx, ack_rx) = flume::unbounded();
-        self.actor_tx
-            .send(actor::Msg::WaitForAck {
-                original_msg: msg,
-                ack_tx,
-                seq,
-            })
-            .wrap_err("Error reaching actor loop")?;
-        ack_rx
-            .recv_async()
-            .await
-            .wrap_err("Error when waiting for ack")?
     }
 
     /// Sends a message and waits for a reply from the destination client.
@@ -463,12 +411,12 @@ impl Client {
     ///     SendMessage::to(EntityType::Orb)
     ///         .id("device_1")
     ///         .namespace("default")
-    ///         .payload("what is your status?")
+    ///         .payload(Any::from_msg(&status_request)?)
     /// ).await?;
     ///
     /// println!("Got response: {:?}", response);
     /// ```
-    pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
+    pub async fn ask(&self, msg: SendMessage) -> Result<Any, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let (reply_tx, reply_rx) = flume::unbounded();
 
@@ -506,9 +454,6 @@ pub(crate) fn relay_payload(
             namespace: msg.target_namespace.clone(),
         }),
         seq,
-        payload: Some(Any {
-            type_url: msg.type_url.clone(),
-            value: msg.data.clone(),
-        }),
+        payload: Some(msg.data.clone()),
     }
 }
