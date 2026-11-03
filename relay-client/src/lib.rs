@@ -108,21 +108,6 @@ impl RecvMessage {
     /// }
     /// ```
     pub async fn reply(&self, payload: Any, qos: QoS) -> Result<(), Err> {
-        let relay_payload = RelayPayload {
-            src: Some(Entity {
-                id: self.client.opts.client_id.clone(),
-                entity_type: self.client.opts.entity_type as i32,
-                namespace: self.client.opts.namespace.clone(),
-            }),
-            dst: Some(Entity {
-                id: self.from.id.clone(),
-                entity_type: self.from.entity_type,
-                namespace: self.from.namespace.clone(),
-            }),
-            seq: self.seq,
-            payload: Some(payload.clone()),
-        };
-
         if let QoS::AtLeastOnce = qos {
             let (ack_tx, ack_rx) = flume::unbounded();
 
@@ -147,6 +132,21 @@ impl RecvMessage {
                 .await
                 .wrap_err("Error when waiting for ack")??;
         } else {
+            let relay_payload = RelayPayload {
+                src: Some(Entity {
+                    id: self.client.opts.client_id.clone(),
+                    entity_type: self.client.opts.entity_type as i32,
+                    namespace: self.client.opts.namespace.clone(),
+                }),
+                dst: Some(Entity {
+                    id: self.from.id.clone(),
+                    entity_type: self.from.entity_type,
+                    namespace: self.from.namespace.clone(),
+                }),
+                seq: self.seq,
+                payload: Some(payload),
+            };
+
             self.client
                 .actor_tx
                 .send(actor::Msg::Send(relay_payload.into()))
@@ -244,8 +244,8 @@ pub struct ClientOpts {
     reply_timeout: Duration,
     #[builder(default = Duration::from_secs(30))]
     heartbeat: Duration,
-    #[builder(default = Amount::Infinite)]
     // Maximum retransmissions after the initial send; zero disables retries.
+    #[builder(default = Amount::Infinite)]
     max_message_attempts: Amount,
     #[builder(default = Duration::from_secs(30))]
     keep_alive_interval: Duration,
