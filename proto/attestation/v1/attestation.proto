@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package attestation.v1;
+
+// Orb device attestation sent to the requesting app session over Orb Relay.
+message DeviceAttestation {
+  // UTF-8 JSON payload as verified by orb-attestation-verifier; kept as JSON so auditors need no protobuf tooling.
+  string payload_json = 1;
+}

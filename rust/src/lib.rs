@@ -30,6 +30,12 @@ pub mod relay {
     }
 }
 
+pub mod attestation {
+    pub mod v1 {
+        tonic::include_proto!("attestation.v1");
+    }
+}
+
 pub mod common {
     pub mod v1 {
         tonic::include_proto!("common.v1");

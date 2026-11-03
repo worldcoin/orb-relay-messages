@@ -42,6 +42,7 @@ fn main() {
                 "./proto/config/backend.proto",
                 "./proto/config/orb.proto",
                 "./proto/jobs/jobs.proto",
+                "./proto/attestation/v1/attestation.proto",
             ],
             &["./proto", "/usr/local/include"],
         )
