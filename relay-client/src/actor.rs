@@ -30,6 +30,22 @@ fn validate_endpoint(endpoint: &str) -> color_eyre::Result<()> {
     Ok(())
 }
 
+fn error_diagnostics(error: &Err) -> (&'static str, Option<i32>) {
+    match error {
+        Err::AckTimeout => ("AckTimeout", None),
+        Err::ReplyTimeout => ("ReplyTimeout", None),
+        Err::ConnectionTimeout => ("ConnectionTimeout", None),
+        Err::AuthenticationFailed => ("AuthenticationFailed", None),
+        Err::StopRequest => ("StopRequest", None),
+        Err::ReconnectRequest => ("ReconnectRequest", None),
+        Err::StreamEnded => ("StreamEnded", None),
+        Err::Channel(_) => ("Channel", None),
+        Err::Transport(_) => ("Transport", None),
+        Err::Tonic(status) => ("Tonic", Some(status.code() as i32)),
+        Err::Other(_) => ("Other", None),
+    }
+}
+
 type ReplySender = flume::Sender<Result<RecvdRelayPayload, Err>>;
 
 #[derive(Default)]
@@ -121,7 +137,10 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
                     _ => {
                         conn_attempts += 1;
 
+                        let (error_kind, grpc_code) = error_diagnostics(&e);
                         error!(
+                            error_kind,
+                            grpc_code,
                             "Relay connection failed. Retrying in {}s",
                             props.opts.connection_backoff.as_secs()
                         );
@@ -498,7 +517,32 @@ async fn connect(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_endpoint;
+    use super::{error_diagnostics, validate_endpoint};
+    use crate::Err;
+
+    #[test]
+    fn reconnect_diagnostics_preserve_categories_without_error_payloads() {
+        assert_eq!(
+            error_diagnostics(&Err::AuthenticationFailed),
+            ("AuthenticationFailed", None)
+        );
+        assert_eq!(
+            error_diagnostics(&Err::ConnectionTimeout),
+            ("ConnectionTimeout", None)
+        );
+        let mut status =
+            tonic::Status::permission_denied("synthetic private error body");
+        status
+            .metadata_mut()
+            .insert("authorization", "synthetic-private-token".parse().unwrap());
+        assert_eq!(error_diagnostics(&Err::Tonic(status)), ("Tonic", Some(7)));
+        assert_eq!(
+            error_diagnostics(&Err::Other(color_eyre::eyre::eyre!(
+                "synthetic private context"
+            ))),
+            ("Other", None)
+        );
+    }
 
     #[test]
     fn https_endpoint_is_accepted() {
