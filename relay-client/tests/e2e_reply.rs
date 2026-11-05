@@ -1,7 +1,11 @@
 #![cfg(feature = "testing")]
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
-use orb_relay_messages::relay::{
-    entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
+use orb_relay_messages::{
+    prost_types::Any,
+    relay::{
+        entity::EntityType, relay_connect_request::Msg, Ack, ConnectRequest,
+        ConnectResponse, Heartbeat,
+    },
 };
 use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
@@ -54,19 +58,29 @@ async fn sends_and_replies_to_message() {
     let (client_foo, _) = Client::connect(opts_foo);
     let (client_boo, _) = Client::connect(opts_boo);
 
+    let question = Any::from_msg(&Heartbeat { seq: 7 }).unwrap();
+    let answer = Any::from_msg(&Ack {
+        seq: 7,
+        subscriber_count: Some(1),
+    })
+    .unwrap();
+
     // Act
     let msg = SendMessage::to(EntityType::App)
         .id("boo")
         .namespace("bar")
-        .payload(b"woah");
+        .payload(question.clone());
 
-    task::spawn(async move {
+    let reply = answer.clone();
+    let received = task::spawn(async move {
         let msg = client_boo.recv().await.unwrap();
-        msg.reply(b"whats up??", QoS::AtMostOnce).await.unwrap();
+        msg.reply(reply, QoS::AtMostOnce).await.unwrap();
+        msg.payload
     });
 
     let res = client_foo.ask(msg).await.unwrap();
 
     // Assert
-    assert_eq!(res, b"whats up??")
+    assert_eq!(received.await.unwrap(), question);
+    assert_eq!(res, answer)
 }

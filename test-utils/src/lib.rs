@@ -121,6 +121,11 @@ lazy_static! {
     static ref TLS_MATERIAL: TlsMaterial = TlsMaterial::new();
 }
 
+/// Server identity signed by the same test CA used by the relay client's testing feature.
+pub fn server_identity() -> Identity {
+    TLS_MATERIAL.identity.clone()
+}
+
 pub fn ca_certificate() -> Certificate {
     TLS_MATERIAL.ca_certificate.clone()
 }

@@ -51,7 +51,10 @@ async fn sends_at_most_once_and_increases_seq() {
         .id("thomas")
         .namespace("anderson")
         .qos(QoS::AtMostOnce)
-        .payload(b"woah");
+        .payload(Any {
+            type_url: String::default(),
+            value: b"woah".to_vec(),
+        });
 
     client.send(msg).await.unwrap();
 
@@ -59,7 +62,10 @@ async fn sends_at_most_once_and_increases_seq() {
         .id("thomas")
         .namespace("anderson")
         .qos(QoS::AtMostOnce)
-        .payload(b"i know kung-fu");
+        .payload(Any {
+            type_url: String::default(),
+            value: b"i know kung-fu".to_vec(),
+        });
 
     client.send(msg).await.unwrap();
 
@@ -150,7 +156,10 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
         .id("thomas")
         .namespace("anderson")
         .qos(QoS::AtLeastOnce)
-        .payload(b"woah");
+        .payload(Any {
+            type_url: String::default(),
+            value: b"woah".to_vec(),
+        });
 
     client.send(msg).await.unwrap();
 
