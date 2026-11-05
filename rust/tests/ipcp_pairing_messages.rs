@@ -6,6 +6,7 @@ use orb_relay_messages::{
     prost::Message,
     self_serve::app::v1::PairingRequest,
 };
+use p256::ecdsa::{signature::Signer as _, Signature, SigningKey};
 
 fn round_trip<M>(message: M) -> M
 where
@@ -177,37 +178,53 @@ fn app_announcement_preserves_remaining_field_numbers() {
 }
 
 #[test]
-fn orb_validation_binds_version_and_both_nonces() {
+fn orb_verification_binds_version_and_both_nonces() {
+    let key = SigningKey::from_slice(&[1; 32]).unwrap();
+    let verify = |data: &OrbAuthenticatedData, request_nonce| {
+        let signature: Signature = key.sign(
+            &[
+                b"orb-authenticated-data-signature",
+                data.encode_to_vec().as_slice(),
+            ]
+            .concat(),
+        );
+        data.verify(key.verifying_key(), &signature, request_nonce)
+    };
     let request_nonce = [3; 32];
     let mut data = OrbAuthenticatedData {
         version: OrbAuthenticatedData::VERSION,
         orb_nonce: vec![7; 32],
         ..Default::default()
     };
-    assert_eq!(data.validate(None), Ok(()));
+    assert_eq!(verify(&data, None), Ok(()));
     assert_eq!(
-        data.validate(Some(request_nonce)),
+        verify(&data, Some(request_nonce)),
         Err(OrbValidationError::RequestNonceMismatch)
     );
     data.request_nonce = request_nonce.to_vec();
-    assert_eq!(data.validate(Some(request_nonce)), Ok(()));
+    assert_eq!(verify(&data, Some(request_nonce)), Ok(()));
     assert_eq!(
-        data.validate(None),
+        verify(&data, None),
         Err(OrbValidationError::UnexpectedRequestNonce)
     );
     assert_eq!(
-        data.validate(Some([4; 32])),
+        verify(&data, Some([4; 32])),
         Err(OrbValidationError::RequestNonceMismatch)
     );
     data.request_nonce.clear();
     data.orb_nonce.pop();
     assert_eq!(
-        data.validate(None),
+        verify(&data, None),
         Err(OrbValidationError::InvalidOrbNonce)
     );
     data.version += 1;
     assert_eq!(
-        data.validate(None),
+        verify(&data, None),
         Err(OrbValidationError::UnsupportedVersion)
+    );
+    let signature: Signature = key.sign(b"invalid");
+    assert_eq!(
+        data.verify(key.verifying_key(), &signature, None),
+        Err(OrbValidationError::InvalidSignature)
     );
 }
