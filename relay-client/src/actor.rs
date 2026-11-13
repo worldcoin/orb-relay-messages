@@ -2,7 +2,7 @@ use crate::{
     flume_receiver_stream, relay_payload, tls, Amount, Auth, ClientId, ClientOpts, Err,
     QoS, RecvdRelayPayload, SendMessage, Seq,
 };
-use color_eyre::eyre::{ensure, eyre, Context};
+use color_eyre::eyre::{ensure, Context};
 use http::{uri::Scheme, Uri};
 use orb_relay_messages::relay::{
     connect_request::AuthMethod, entity::EntityType, relay_connect_request,
@@ -30,11 +30,28 @@ fn validate_endpoint(endpoint: &str) -> color_eyre::Result<()> {
     Ok(())
 }
 
+fn error_diagnostics(error: &Err) -> (&'static str, Option<i32>) {
+    match error {
+        Err::AckTimeout => ("AckTimeout", None),
+        Err::ReplyTimeout => ("ReplyTimeout", None),
+        Err::ConnectionTimeout => ("ConnectionTimeout", None),
+        Err::AuthenticationFailed => ("AuthenticationFailed", None),
+        Err::StopRequest => ("StopRequest", None),
+        Err::ReconnectRequest => ("ReconnectRequest", None),
+        Err::StreamEnded => ("StreamEnded", None),
+        Err::Channel(_) => ("Channel", None),
+        Err::Transport(_) => ("Transport", None),
+        Err::Tonic(status) => ("Tonic", Some(status.code() as i32)),
+        Err::Other(_) => ("Other", None),
+    }
+}
+
+type ReplySender = flume::Sender<Result<RecvdRelayPayload, Err>>;
+
 #[derive(Default)]
 pub struct State {
-    pending_acks: HashMap<Seq, (SendMessage, flume::Sender<()>)>,
-    pending_replies:
-        HashMap<(ClientId, Seq), (SendMessage, flume::Sender<RecvdRelayPayload>)>,
+    pending_acks: HashMap<Seq, (SendMessage, flume::Sender<Result<(), Err>>)>,
+    pending_replies: HashMap<(ClientId, Seq), (SendMessage, ReplySender)>,
     heartbeat_started: bool,
 }
 
@@ -53,13 +70,13 @@ pub(crate) enum Msg {
 
     WaitForAck {
         original_msg: SendMessage,
-        ack_tx: flume::Sender<()>,
+        ack_tx: flume::Sender<Result<(), Err>>,
         seq: Seq,
     },
 
     WaitForReply {
         original_msg: SendMessage,
-        recv_msg_tx: flume::Sender<RecvdRelayPayload>,
+        recv_msg_tx: ReplySender,
         seq: Seq,
     },
 
@@ -92,6 +109,7 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
 
         loop {
             let cancellation_token = CancellationToken::new();
+            let _cancel_on_drop = cancellation_token.clone().drop_guard();
             let result = main_loop(
                 &mut state,
                 &props,
@@ -119,9 +137,12 @@ pub fn run(props: Props) -> (flume::Sender<Msg>, task::JoinHandle<Result<(), Err
                     _ => {
                         conn_attempts += 1;
 
+                        let (error_kind, grpc_code) = error_diagnostics(&e);
                         error!(
-                            "RelayClient errored out {e:?}. Retrying in {}s",
-                            props.opts.connection_timeout.as_secs()
+                            error_kind,
+                            grpc_code,
+                            "Relay connection failed. Retrying in {}s",
+                            props.opts.connection_backoff.as_secs()
                         );
 
                         time::sleep(props.opts.connection_backoff).await;
@@ -146,7 +167,7 @@ async fn main_loop(
         connect(props, &relay_actor_tx, cancellation_token),
     )
     .await
-    .wrap_err("Timed out trying to establish a connection")??;
+    .map_err(|_| Err::ConnectionTimeout)??;
 
     if !state.heartbeat_started {
         state.heartbeat_started = true;
@@ -197,7 +218,7 @@ fn handle_msg(
         })) => {
             let recv_msg = RecvdRelayPayload {
                 from: entity,
-                payload: payload.value,
+                payload,
                 seq,
             };
             handle_payload(state, recv_msg, seq, &props.client_tx)?;
@@ -207,9 +228,7 @@ fn handle_msg(
             handle_ack(state, seq)
         }
 
-        Msg::RelayResponse(other_msg) => {
-            debug!(" Received a non-Any message: {:?}", other_msg)
-        }
+        Msg::RelayResponse(_) => debug!("Ignoring unexpected relay response"),
 
         Msg::Send(payload) => {
             props
@@ -227,10 +246,15 @@ fn handle_msg(
             ack_tx,
             seq,
         } => {
+            let payload = relay_payload(&props.opts, &original_msg, seq);
+            let retries_left = props.opts.max_message_attempts;
             state.pending_acks.insert(seq, (original_msg, ack_tx));
+            props
+                .tonic_tx
+                .send(payload.into())
+                .wrap_err("Failed to send payload")?;
 
             let backoff = props.opts.ack_timeout;
-            let retries_left = props.opts.max_message_attempts;
             let tx = relay_actor_tx.clone();
 
             task::spawn(async move {
@@ -244,11 +268,16 @@ fn handle_msg(
             seq,
             recv_msg_tx,
         } => {
+            let payload = relay_payload(&props.opts, &original_msg, seq);
             state.pending_replies.insert(
                 (original_msg.target_id.clone(), seq),
                 (original_msg.clone(), recv_msg_tx.clone()),
             );
 
+            props
+                .tonic_tx
+                .send(payload.into())
+                .wrap_err("Failed to send payload")?;
             let backoff = props.opts.reply_timeout;
             let retries_left = match original_msg.qos {
                 QoS::AtMostOnce => Amount::Val(0),
@@ -270,10 +299,10 @@ fn handle_msg(
         Msg::RetryAck { seq, retries_left } => {
             if let Some((msg, _sender)) = state.pending_acks.get(&seq) {
                 if retries_left.is_zero() {
-                    error!(
-                        "Failed to send message with seq {seq} after multiple retries."
-                    );
-
+                    if let Some((_, sender)) = state.pending_acks.remove(&seq) {
+                        // The caller may already have cancelled its wait.
+                        let _ = sender.send(Err(Err::AckTimeout));
+                    }
                     return Ok(());
                 }
 
@@ -284,7 +313,6 @@ fn handle_msg(
                     .wrap_err("Failed to send retry message to tonic_tx")?;
 
                 let backoff = props.opts.ack_timeout;
-                let retries_left = props.opts.max_message_attempts;
                 let tx = relay_actor_tx.clone();
 
                 task::spawn(async move {
@@ -306,10 +334,12 @@ fn handle_msg(
                 state.pending_replies.get(&(from_client.clone(), seq))
             {
                 if retries_left.is_zero() {
-                    error!(
-                        "Failed to send message with seq {seq} after multiple retries."
-                    );
-
+                    if let Some((_, sender)) =
+                        state.pending_replies.remove(&(from_client.clone(), seq))
+                    {
+                        // The caller may already have cancelled its wait.
+                        let _ = sender.send(Err(Err::ReplyTimeout));
+                    }
                     return Ok(());
                 }
 
@@ -320,7 +350,6 @@ fn handle_msg(
                     .wrap_err("Failed to send retry message to tonic_tx")?;
 
                 let backoff = props.opts.reply_timeout;
-                let retries_left = props.opts.max_message_attempts;
                 let tx = relay_actor_tx.clone();
 
                 task::spawn(async move {
@@ -339,9 +368,8 @@ fn handle_msg(
                 .tonic_tx
                 .send(
                     orb_relay_messages::relay::Heartbeat {
-                        // we don't care about seq here
-                        // this is just to maintain connection alive
-                        seq: 0,
+                        // Keep heartbeat ACKs separate from payload sequence numbers.
+                        seq: u64::MAX,
                     }
                     .into(),
                 )
@@ -369,7 +397,7 @@ fn handle_payload(
 ) -> color_eyre::Result<()> {
     let key = (recv_msg.from.id.clone(), seq);
     if let Some((_msg, reply)) = state.pending_replies.remove(&key) {
-        if reply.send(recv_msg).is_err() {
+        if reply.send(Ok(recv_msg)).is_err() {
             error!("Failed to send reply from message with seq {seq}. Seems like scope containing .ask call was dropped.");
         }
     } else {
@@ -383,7 +411,7 @@ fn handle_payload(
 
 fn handle_ack(state: &mut State, seq: Seq) {
     if let Some((_pending_msg, ack_tx)) = state.pending_acks.remove(&seq) {
-        let _ = ack_tx.send(());
+        let _ = ack_tx.send(Ok(()));
     };
 }
 
@@ -463,8 +491,8 @@ async fn connect(
         .await?
         .into_inner();
 
-    while let Some(message) = response_stream.next().await {
-        match message?.msg {
+    loop {
+        match response_stream.next().await.ok_or(Err::StreamEnded)??.msg {
             Some(relay_connect_response::Msg::ConnectResponse(ConnectResponse {
                 success: true,
                 ..
@@ -472,20 +500,14 @@ async fn connect(
                 info!("Connection established successfully.");
                 break;
             }
-
-            Some(relay_connect_response::Msg::ConnectResponse(ConnectResponse {
-                success: false,
-                ..
-            })) => {
-                return Err(eyre!("Failed to establish connection.").into());
+            Some(relay_connect_response::Msg::ConnectResponse(_)) => {
+                return Err(Err::AuthenticationFailed);
             }
-
             Some(msg) => {
                 relay_actor_tx
                     .send(Msg::RelayResponse(msg))
                     .wrap_err("relay_actor_tx receivers unexpectedly dropped")?;
             }
-
             None => (),
         }
     }
@@ -495,7 +517,32 @@ async fn connect(
 
 #[cfg(test)]
 mod tests {
-    use super::validate_endpoint;
+    use super::{error_diagnostics, validate_endpoint};
+    use crate::Err;
+
+    #[test]
+    fn reconnect_diagnostics_preserve_categories_without_error_payloads() {
+        assert_eq!(
+            error_diagnostics(&Err::AuthenticationFailed),
+            ("AuthenticationFailed", None)
+        );
+        assert_eq!(
+            error_diagnostics(&Err::ConnectionTimeout),
+            ("ConnectionTimeout", None)
+        );
+        let mut status =
+            tonic::Status::permission_denied("synthetic private error body");
+        status
+            .metadata_mut()
+            .insert("authorization", "synthetic-private-token".parse().unwrap());
+        assert_eq!(error_diagnostics(&Err::Tonic(status)), ("Tonic", Some(7)));
+        assert_eq!(
+            error_diagnostics(&Err::Other(color_eyre::eyre::eyre!(
+                "synthetic private context"
+            ))),
+            ("Other", None)
+        );
+    }
 
     #[test]
     fn https_endpoint_is_accepted() {

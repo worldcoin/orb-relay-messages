@@ -38,7 +38,6 @@ pub type Seq = u64;
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
 #[builder(on(Vec<u8>, into))]
-#[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
 #[builder(finish_fn = payload)]
 pub struct SendMessage {
@@ -46,6 +45,11 @@ pub struct SendMessage {
     target_type: EntityType,
     #[builder(finish_fn)]
     data: Vec<u8>,
+    /// Type URL of the relay payload's outer Protobuf Any. Empty for opaque bytes.
+    /// Set this when the peer unpacks that outer Any directly; do not encode an
+    /// additional Any into the payload in that case.
+    #[builder(default)]
+    type_url: String,
     #[builder(setters(name = id))]
     target_id: String,
     #[builder(setters(name = namespace))]
@@ -82,62 +86,51 @@ pub enum QoS {
 
 pub(crate) struct RecvdRelayPayload {
     pub from: Entity,
-    pub payload: Vec<u8>,
+    pub payload: Any,
     pub seq: Seq,
 }
 
 #[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
+    /// Bytes carried by the relay payload, without decoding or unwrapping them.
     pub payload: Vec<u8>,
+    /// Type URL from the outer Protobuf Any, separate from the payload bytes.
+    pub type_url: String,
     client: Client,
     seq: Seq,
 }
 
+#[bon::bon]
 impl RecvMessage {
-    /// Reply to the sender of this message with a payload and specified QoS level.
+    /// Reply to the sender with the same sequence number.
+    /// Delivery defaults to at-most-once and the outer type URL defaults to empty;
+    /// the reply does not inherit the incoming message's type URL.
     ///
     /// # Example
     /// ```ignore
     /// async fn handle_message(client: &Client) {
     ///     while let Ok(msg) = client.recv().await {
-    ///         // Reply with "hello" using at-most-once delivery
-    ///         msg.reply(b"hello", QoS::AtMostOnce).await.unwrap();
+    ///         // Reply using at-most-once delivery
+    ///         msg.reply(b"hello").send().await.unwrap();
     ///
-    ///         // Reply with bytes using at-least-once delivery
-    ///         msg.reply(vec![1, 2, 3], QoS::AtLeastOnce).await.unwrap();
+    ///         // Reply using at-least-once delivery
+    ///         msg.reply(vec![1, 2, 3])
+    ///             .qos(QoS::AtLeastOnce)
+    ///             .type_url("type.googleapis.com/example.Response")
+    ///             .send()
+    ///             .await
+    ///             .unwrap();
     ///     }
     /// }
     /// ```
+    #[builder(finish_fn = send)]
     pub async fn reply(
         &self,
-        payload: impl Into<Vec<u8>>,
-        qos: QoS,
+        #[builder(start_fn, into)] payload: Vec<u8>,
+        #[builder(default = QoS::AtMostOnce)] qos: QoS,
+        #[builder(default, into)] type_url: String,
     ) -> Result<(), Err> {
-        let payload = payload.into();
-        let relay_payload = RelayPayload {
-            src: Some(Entity {
-                id: self.client.opts.client_id.clone(),
-                entity_type: self.client.opts.entity_type as i32,
-                namespace: self.client.opts.namespace.clone(),
-            }),
-            dst: Some(Entity {
-                id: self.from.id.clone(),
-                entity_type: self.from.entity_type,
-                namespace: self.from.namespace.clone(),
-            }),
-            seq: self.seq,
-            payload: Some(Any {
-                type_url: "".to_string(),
-                value: payload.clone(),
-            }),
-        };
-
-        self.client
-            .actor_tx
-            .send(actor::Msg::Send(relay_payload.into()))
-            .wrap_err("Failed to send message to tonic")?;
-
         if let QoS::AtLeastOnce = qos {
             let (ack_tx, ack_rx) = flume::unbounded();
 
@@ -148,6 +141,7 @@ impl RecvMessage {
                         target_type: EntityType::try_from(self.from.entity_type)
                             .wrap_err("Failed to convert EntityType")?,
                         data: payload,
+                        type_url,
                         target_id: self.from.id.clone(),
                         target_namespace: self.from.namespace.clone(),
                         qos,
@@ -160,7 +154,30 @@ impl RecvMessage {
             ack_rx
                 .recv_async()
                 .await
-                .wrap_err("Error when waiting for ack")?;
+                .wrap_err("Error when waiting for ack")??;
+        } else {
+            let relay_payload = RelayPayload {
+                src: Some(Entity {
+                    id: self.client.opts.client_id.clone(),
+                    entity_type: self.client.opts.entity_type as i32,
+                    namespace: self.client.opts.namespace.clone(),
+                }),
+                dst: Some(Entity {
+                    id: self.from.id.clone(),
+                    entity_type: self.from.entity_type,
+                    namespace: self.from.namespace.clone(),
+                }),
+                seq: self.seq,
+                payload: Some(Any {
+                    type_url,
+                    value: payload,
+                }),
+            };
+
+            self.client
+                .actor_tx
+                .send(actor::Msg::Send(relay_payload.into()))
+                .wrap_err("Error reaching actor loop")?;
         };
 
         Ok(())
@@ -169,6 +186,10 @@ impl RecvMessage {
 
 #[derive(From, Debug)]
 pub enum Err {
+    AckTimeout,
+    ReplyTimeout,
+    ConnectionTimeout,
+    AuthenticationFailed,
     StopRequest,
     ReconnectRequest,
     StreamEnded,
@@ -250,6 +271,7 @@ pub struct ClientOpts {
     reply_timeout: Duration,
     #[builder(default = Duration::from_secs(30))]
     heartbeat: Duration,
+    // Maximum retransmissions after the initial send; zero disables retries.
     #[builder(default = Amount::Infinite)]
     max_message_attempts: Amount,
     #[builder(default = Duration::from_secs(30))]
@@ -352,7 +374,8 @@ impl Client {
 
         Ok(RecvMessage {
             from: msg.from,
-            payload: msg.payload,
+            payload: msg.payload.value,
+            type_url: msg.payload.type_url,
             client: self.clone(),
             seq: msg.seq,
         })
@@ -378,20 +401,13 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtLeastOnce)
-    ///         .payload(vec![1,2,3])
+    ///         .payload(b"hello")
     /// ).await?;
     /// ```
     pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
-        let payload = relay_payload(&self.opts, &msg, seq);
-
-        self.actor_tx
-            .send(actor::Msg::Send(payload.into()))
-            .wrap_err("Failed to send message to tonic")?;
-
         if let QoS::AtLeastOnce = msg.qos {
             let (ack_tx, ack_rx) = flume::unbounded();
-
             self.actor_tx
                 .send(actor::Msg::WaitForAck {
                     original_msg: msg,
@@ -399,19 +415,23 @@ impl Client {
                     seq,
                 })
                 .wrap_err("Error reaching actor loop")?;
-
             ack_rx
                 .recv_async()
                 .await
-                .wrap_err("Error when waiting for ack")?;
-        };
-
+                .wrap_err("Error when waiting for ack")??;
+        } else {
+            let payload = relay_payload(&self.opts, &msg, seq);
+            self.actor_tx
+                .send(actor::Msg::Send(payload.into()))
+                .wrap_err("Error reaching actor loop")?;
+        }
         Ok(())
     }
 
     /// Sends a message and waits for a reply from the destination client.
     /// Unlike `send()` with `QoS::AtLeastOnce` which only confirms delivery to the orb-relay server,
     /// this method waits for an actual response from the target client.
+    /// Returns the response bytes without its outer type metadata.
     ///
     /// # Example
     /// ```ignore
@@ -420,19 +440,13 @@ impl Client {
     ///     SendMessage::to(EntityType::Orb)
     ///         .id("device_1")
     ///         .namespace("default")
-    ///         .payload("what is your status?")
+    ///         .payload(b"what is your status?")
     /// ).await?;
     ///
     /// println!("Got response: {:?}", response);
     /// ```
     pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
-        let payload = relay_payload(&self.opts, &msg, seq);
-
-        self.actor_tx
-            .send(actor::Msg::Send(payload.into()))
-            .wrap_err("Failed to send message to tonic")?;
-
         let (reply_tx, reply_rx) = flume::unbounded();
 
         self.actor_tx
@@ -446,9 +460,9 @@ impl Client {
         let reply = reply_rx
             .recv_async()
             .await
-            .wrap_err("Error when waiting for ack")?;
+            .wrap_err("Error when waiting for reply")??;
 
-        Ok(reply.payload)
+        Ok(reply.payload.value)
     }
 }
 
@@ -470,7 +484,7 @@ pub(crate) fn relay_payload(
         }),
         seq,
         payload: Some(Any {
-            type_url: "".to_string(),
+            type_url: msg.type_url.clone(),
             value: msg.data.clone(),
         }),
     }

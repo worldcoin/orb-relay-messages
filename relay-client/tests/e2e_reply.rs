@@ -1,18 +1,24 @@
 #![cfg(feature = "testing")]
-use orb_relay_client::{Amount, Auth, Client, ClientOpts, QoS, SendMessage};
+use orb_relay_client::{Amount, Auth, Client, ClientOpts, SendMessage};
 use orb_relay_messages::relay::{
     entity::EntityType, relay_connect_request::Msg, ConnectRequest, ConnectResponse,
 };
 use orb_relay_test_utils::{IntoRes, TestServer};
 use std::time::Duration;
-use tokio::task;
+use tokio::{task, time::timeout};
 
 struct NoState;
 
 #[tokio::test]
 async fn sends_and_replies_to_message() {
+    for type_url in [None, Some("type.googleapis.com/test.Response")] {
+        check_reply(type_url).await;
+    }
+}
+
+async fn check_reply(type_url: Option<&'static str>) {
     // Arrange
-    let sv = TestServer::new(NoState, |_, conn_req, clients| match conn_req {
+    let sv = TestServer::new(NoState, move |_, conn_req, clients| match conn_req {
         Msg::ConnectRequest(ConnectRequest { client_id, .. }) => ConnectResponse {
             client_id: client_id.unwrap().id.clone(),
             success: true,
@@ -21,6 +27,12 @@ async fn sends_and_replies_to_message() {
         .into_res(),
 
         Msg::Payload(payload) => {
+            let expected_type = if payload.src.as_ref().unwrap().id == "boo" {
+                type_url.unwrap_or_default()
+            } else {
+                ""
+            };
+            assert_eq!(payload.payload.as_ref().unwrap().type_url, expected_type);
             clients.send(payload);
             None
         }
@@ -60,12 +72,21 @@ async fn sends_and_replies_to_message() {
         .namespace("bar")
         .payload(b"woah");
 
-    task::spawn(async move {
+    let reply_task = task::spawn(async move {
         let msg = client_boo.recv().await.unwrap();
-        msg.reply(b"whats up??", QoS::AtMostOnce).await.unwrap();
+        let builder = msg.reply(b"whats up??");
+        if let Some(type_url) = type_url {
+            builder.type_url(type_url).send().await.unwrap();
+        } else {
+            builder.send().await.unwrap();
+        }
     });
 
-    let res = client_foo.ask(msg).await.unwrap();
+    let res = timeout(Duration::from_secs(10), client_foo.ask(msg))
+        .await
+        .unwrap()
+        .unwrap();
+    reply_task.await.unwrap();
 
     // Assert
     assert_eq!(res, b"whats up??")
