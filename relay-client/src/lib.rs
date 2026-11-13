@@ -31,19 +31,25 @@ pub type Seq = u64;
 ///     .id("device_123")
 ///     .namespace("default")
 ///     .qos(QoS::AtLeastOnce) // Optional, defaults to AtMostOnce
-///     .payload(Any::from_msg(&message)?);
+///     .payload(b"hello");
 ///
 /// client.send(msg).await.unwrap();
 /// ```
 #[derive(Debug, Builder, Clone)]
 #[builder(on(String, into))]
+#[builder(on(Vec<u8>, into))]
 #[builder(start_fn = to)]
 #[builder(finish_fn = payload)]
 pub struct SendMessage {
     #[builder(start_fn)]
     target_type: EntityType,
     #[builder(finish_fn)]
-    data: Any,
+    data: Vec<u8>,
+    /// Type URL of the relay payload's outer Protobuf Any. Empty for opaque bytes.
+    /// Set this when the peer unpacks that outer Any directly; do not encode an
+    /// additional Any into the payload in that case.
+    #[builder(default)]
+    type_url: String,
     #[builder(setters(name = id))]
     target_id: String,
     #[builder(setters(name = namespace))]
@@ -87,27 +93,44 @@ pub(crate) struct RecvdRelayPayload {
 #[derive(Debug)]
 pub struct RecvMessage {
     pub from: Entity,
-    pub payload: Any,
+    /// Bytes carried by the relay payload, without decoding or unwrapping them.
+    pub payload: Vec<u8>,
+    /// Type URL from the outer Protobuf Any, separate from the payload bytes.
+    pub type_url: String,
     client: Client,
     seq: Seq,
 }
 
+#[bon::bon]
 impl RecvMessage {
-    /// Reply to the sender of this message with a payload and specified QoS level.
+    /// Reply to the sender with the same sequence number.
+    /// Delivery defaults to at-most-once and the outer type URL defaults to empty;
+    /// the reply does not inherit the incoming message's type URL.
     ///
     /// # Example
     /// ```ignore
     /// async fn handle_message(client: &Client) {
     ///     while let Ok(msg) = client.recv().await {
     ///         // Reply using at-most-once delivery
-    ///         msg.reply(Any::from_msg(&response)?, QoS::AtMostOnce).await.unwrap();
+    ///         msg.reply(b"hello").send().await.unwrap();
     ///
     ///         // Reply using at-least-once delivery
-    ///         msg.reply(Any::from_msg(&response)?, QoS::AtLeastOnce).await.unwrap();
+    ///         msg.reply(vec![1, 2, 3])
+    ///             .qos(QoS::AtLeastOnce)
+    ///             .type_url("type.googleapis.com/example.Response")
+    ///             .send()
+    ///             .await
+    ///             .unwrap();
     ///     }
     /// }
     /// ```
-    pub async fn reply(&self, payload: Any, qos: QoS) -> Result<(), Err> {
+    #[builder(finish_fn = send)]
+    pub async fn reply(
+        &self,
+        #[builder(start_fn, into)] payload: Vec<u8>,
+        #[builder(default = QoS::AtMostOnce)] qos: QoS,
+        #[builder(default, into)] type_url: String,
+    ) -> Result<(), Err> {
         if let QoS::AtLeastOnce = qos {
             let (ack_tx, ack_rx) = flume::unbounded();
 
@@ -118,6 +141,7 @@ impl RecvMessage {
                         target_type: EntityType::try_from(self.from.entity_type)
                             .wrap_err("Failed to convert EntityType")?,
                         data: payload,
+                        type_url,
                         target_id: self.from.id.clone(),
                         target_namespace: self.from.namespace.clone(),
                         qos,
@@ -144,7 +168,10 @@ impl RecvMessage {
                     namespace: self.from.namespace.clone(),
                 }),
                 seq: self.seq,
-                payload: Some(payload),
+                payload: Some(Any {
+                    type_url,
+                    value: payload,
+                }),
             };
 
             self.client
@@ -347,7 +374,8 @@ impl Client {
 
         Ok(RecvMessage {
             from: msg.from,
-            payload: msg.payload,
+            payload: msg.payload.value,
+            type_url: msg.payload.type_url,
             client: self.clone(),
             seq: msg.seq,
         })
@@ -364,7 +392,7 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtMostOnce)
-    ///         .payload(Any::from_msg(&message)?)
+    ///         .payload(b"hello")
     /// ).await?;
     ///
     /// // Send with at-least-once delivery (waits for ack)
@@ -373,7 +401,7 @@ impl Client {
     ///         .id("device_1")
     ///         .namespace("default")
     ///         .qos(QoS::AtLeastOnce)
-    ///         .payload(Any::from_msg(&message)?)
+    ///         .payload(b"hello")
     /// ).await?;
     /// ```
     pub async fn send(&self, msg: SendMessage) -> Result<(), Err> {
@@ -403,6 +431,7 @@ impl Client {
     /// Sends a message and waits for a reply from the destination client.
     /// Unlike `send()` with `QoS::AtLeastOnce` which only confirms delivery to the orb-relay server,
     /// this method waits for an actual response from the target client.
+    /// Returns the response bytes without its outer type metadata.
     ///
     /// # Example
     /// ```ignore
@@ -411,12 +440,12 @@ impl Client {
     ///     SendMessage::to(EntityType::Orb)
     ///         .id("device_1")
     ///         .namespace("default")
-    ///         .payload(Any::from_msg(&status_request)?)
+    ///         .payload(b"what is your status?")
     /// ).await?;
     ///
     /// println!("Got response: {:?}", response);
     /// ```
-    pub async fn ask(&self, msg: SendMessage) -> Result<Any, Err> {
+    pub async fn ask(&self, msg: SendMessage) -> Result<Vec<u8>, Err> {
         let seq = self.seq.fetch_add(1, Ordering::SeqCst);
         let (reply_tx, reply_rx) = flume::unbounded();
 
@@ -433,7 +462,7 @@ impl Client {
             .await
             .wrap_err("Error when waiting for reply")??;
 
-        Ok(reply.payload)
+        Ok(reply.payload.value)
     }
 }
 
@@ -454,6 +483,9 @@ pub(crate) fn relay_payload(
             namespace: msg.target_namespace.clone(),
         }),
         seq,
-        payload: Some(msg.data.clone()),
+        payload: Some(Any {
+            type_url: msg.type_url.clone(),
+            value: msg.data.clone(),
+        }),
     }
 }

@@ -2,6 +2,8 @@
 
 use orb_relay_client::{Amount, Auth, Client, ClientOpts, Err, QoS, SendMessage};
 use orb_relay_messages::{
+    common::v1 as common,
+    prost::Message,
     prost_types::Any,
     relay::{
         entity::EntityType, relay_connect_request::Msg, Ack, ConnectResponse, Entity,
@@ -32,14 +34,18 @@ fn message(qos: QoS) -> SendMessage {
         .id("app")
         .namespace("test")
         .qos(qos)
-        .payload(Any {
-            type_url: "type.googleapis.com/test.Message".into(),
-            value: b"synthetic-payload".to_vec(),
-        })
+        .type_url("type.googleapis.com/test.Message")
+        .payload(b"synthetic-payload")
 }
 
 #[tokio::test]
-async fn receive_and_acknowledged_reply_preserve_type() {
+async fn receive_exposes_type_and_reply_retries_preserve_wire_format() {
+    for type_url in [None, Some("type.googleapis.com/test.Reply")] {
+        check_reply_retries(type_url).await;
+    }
+}
+
+async fn check_reply_retries(type_url: Option<&str>) {
     let packet = RelayPayload {
         src: Some(Entity {
             id: "app".into(),
@@ -91,17 +97,25 @@ async fn receive_and_acknowledged_reply_preserve_type() {
         .unwrap()
         .unwrap();
     let reply = Any {
-        type_url: "type.googleapis.com/test.Reply".into(),
+        type_url: type_url.unwrap_or_default().into(),
         value: vec![4, 5],
     };
-    timeout(
-        Duration::from_secs(3),
-        received.reply(reply.clone(), QoS::AtLeastOnce),
-    )
+    timeout(Duration::from_secs(3), async {
+        let builder = received.reply(reply.value.clone()).qos(QoS::AtLeastOnce);
+        if let Some(type_url) = type_url {
+            builder.type_url(type_url).send().await
+        } else {
+            builder.send().await
+        }
+    })
     .await
     .unwrap()
     .unwrap();
-    assert_eq!(Some(received.payload), expected.payload);
+    assert_eq!(received.payload, expected.payload.as_ref().unwrap().value);
+    assert_eq!(
+        received.type_url,
+        expected.payload.as_ref().unwrap().type_url
+    );
     assert_eq!(Some(received.from), expected.src);
     let packets = server.state().await;
     assert_eq!(packets.len(), 2);
@@ -208,4 +222,125 @@ async fn connection_failures_remain_distinguishable() {
                 | (2, Err::StreamEnded)
         ));
     }
+}
+
+#[tokio::test]
+async fn typed_send_retries_preserve_the_outer_any_without_nesting() {
+    let body = common::W {
+        w: Some(common::w::W::Heartbeat(common::Heartbeat { seq: 7 })),
+    };
+    let expected = Any::from_msg(&body).unwrap();
+    let server = TestServer::new(Vec::new(), |packets, request, _| match request {
+        Msg::ConnectRequest(request) => ConnectResponse {
+            client_id: request.client_id.unwrap().id,
+            success: true,
+            ..Default::default()
+        }
+        .into_res(),
+        Msg::Payload(packet) => {
+            let seq = packet.seq;
+            packets.push(packet);
+            if packets.len() == 1 {
+                return None;
+            }
+            Ack {
+                seq,
+                subscriber_count: Some(1),
+            }
+            .into_res()
+        }
+        _ => None,
+    })
+    .await;
+    let (client, task) =
+        Client::connect(options(format!("https://{}", server.addr()), 2));
+    let request = SendMessage::to(EntityType::App)
+        .id("app")
+        .namespace("test")
+        .qos(QoS::AtLeastOnce)
+        .type_url(expected.type_url.clone())
+        .payload(body.encode_to_vec());
+    timeout(Duration::from_secs(3), client.send(request))
+        .await
+        .unwrap()
+        .unwrap();
+    let packets = server.state().await;
+    assert_eq!(packets.len(), 2);
+    assert_eq!(packets[0], packets[1]);
+    assert_eq!(packets[0].payload.as_ref(), Some(&expected));
+    // The peer can unpack the outer Any directly as the application message.
+    assert_eq!(
+        packets[0]
+            .payload
+            .as_ref()
+            .unwrap()
+            .to_msg::<common::W>()
+            .unwrap(),
+        body
+    );
+    drop(packets);
+    client.stop().await.unwrap();
+    timeout(Duration::from_secs(1), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+}
+
+#[tokio::test]
+async fn opaque_bytes_preserve_the_jobs_agents_encoded_any_convention() {
+    let inner = Any::from_msg(&common::Heartbeat { seq: 19 }).unwrap();
+    let bytes = inner.encode_to_vec();
+    let expected = bytes.clone();
+    let server = TestServer::new((), move |_, request, clients| match request {
+        Msg::ConnectRequest(request) => ConnectResponse {
+            client_id: request.client_id.unwrap().id,
+            success: true,
+            ..Default::default()
+        }
+        .into_res(),
+        Msg::Payload(packet) => {
+            let payload = packet.payload.as_ref().unwrap();
+            assert!(payload.type_url.is_empty());
+            assert_eq!(payload.value, expected);
+            let seq = packet.seq;
+            clients.send(RelayPayload {
+                src: packet.dst,
+                dst: packet.src,
+                seq,
+                payload: packet.payload,
+            });
+            Ack {
+                seq,
+                subscriber_count: Some(1),
+            }
+            .into_res()
+        }
+        _ => None,
+    })
+    .await;
+    let (client, task) =
+        Client::connect(options(format!("https://{}", server.addr()), 0));
+    let request = SendMessage::to(EntityType::App)
+        .id("app")
+        .namespace("test")
+        .qos(QoS::AtLeastOnce)
+        .payload(bytes.clone());
+    timeout(Duration::from_secs(3), client.send(request))
+        .await
+        .unwrap()
+        .unwrap();
+    let received = timeout(Duration::from_secs(3), client.recv())
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(received.type_url.is_empty());
+    assert_eq!(received.payload, bytes);
+    assert_eq!(Any::decode(received.payload.as_slice()).unwrap(), inner);
+    client.stop().await.unwrap();
+    timeout(Duration::from_secs(1), task)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
 }

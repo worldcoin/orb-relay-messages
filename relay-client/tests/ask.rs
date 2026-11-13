@@ -65,15 +65,12 @@ async fn asks_at_most_once() {
         .id("banana")
         .namespace("yellow")
         .qos(QoS::AtMostOnce)
-        .payload(Any {
-            type_url: String::default(),
-            value: b"ping".to_vec(),
-        });
+        .payload(b"ping");
 
     let reply = client.ask(msg).await.unwrap();
 
     // Assert
-    assert_eq!(b"pong".as_ref(), reply.value);
+    assert_eq!(b"pong".as_ref(), reply);
 
     // we await 50ms because if there is a bug given reply timeout is 1ms we would see multiple messages
     time::sleep(Duration::from_millis(50)).await;
@@ -153,15 +150,12 @@ async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
         .id("blueberry")
         .namespace("purple")
         .qos(QoS::AtLeastOnce)
-        .payload(Any {
-            type_url: String::default(),
-            value: b"ping".to_vec(),
-        });
+        .payload(b"ping");
 
     let reply = client.ask(msg).await.unwrap();
 
     // Assert
-    assert_eq!(b"pong".as_ref(), reply.value);
+    assert_eq!(b"pong".as_ref(), reply);
 
     time::sleep(Duration::from_millis(100)).await; // wait extra time so we see if we send any extra attempts
     let actual = sv.state().await.clone();
@@ -240,19 +234,16 @@ async fn ask_increases_seq() {
         .id("banana")
         .namespace("yellow")
         .qos(QoS::AtMostOnce)
-        .payload(Any {
-            type_url: String::default(),
-            value: b"ping".to_vec(),
-        });
+        .payload(b"ping");
 
     let reply1 = client.ask(msg.clone()).await.unwrap();
     let reply2 = client.ask(msg.clone()).await.unwrap();
     let reply3 = client.ask(msg).await.unwrap();
 
     // Assert
-    assert_eq!(b"pong".as_ref(), reply1.value);
-    assert_eq!(b"pong".as_ref(), reply2.value);
-    assert_eq!(b"pong".as_ref(), reply3.value);
+    assert_eq!(b"pong".as_ref(), reply1);
+    assert_eq!(b"pong".as_ref(), reply2);
+    assert_eq!(b"pong".as_ref(), reply3);
 
     // we await 50ms because if there is a bug given reply timeout is 1ms we would see multiple messages
     time::sleep(Duration::from_millis(50)).await;
