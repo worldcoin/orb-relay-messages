@@ -32,7 +32,7 @@ async fn connects() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
@@ -66,7 +66,7 @@ async fn tries_to_connect_the_expected_number_of_times_then_gives_up() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
@@ -100,7 +100,7 @@ async fn sleeps_for_backoff_period_between_connection_attempts() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))

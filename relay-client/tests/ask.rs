@@ -47,7 +47,7 @@ async fn asks_at_most_once() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("apple")
+        .src_id("apple")
         .namespace("green")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
@@ -133,7 +133,7 @@ async fn ask_sends_at_least_once_retrying_until_reply_is_received() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("papaya")
+        .src_id("papaya")
         .namespace("orange")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
@@ -216,7 +216,7 @@ async fn ask_increases_seq() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("apple")
+        .src_id("apple")
         .namespace("green")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))

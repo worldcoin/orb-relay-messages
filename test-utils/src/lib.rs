@@ -15,6 +15,7 @@ use tokio::{
 };
 use tokio_stream::{wrappers::TcpListenerStream, Stream};
 use tonic::{
+    service::Interceptor,
     transport::{Certificate, Identity, Server, ServerTlsConfig},
     Request, Response, Status, Streaming,
 };
@@ -253,6 +254,22 @@ where
             + Sync
             + 'static,
     {
+        Self::with_interceptor(state, handler, Ok).await
+    }
+
+    /// Creates a test server whose interceptor can inspect gRPC request metadata.
+    pub async fn with_interceptor<F, I>(state: S, handler: F, interceptor: I) -> Self
+    where
+        F: Fn(
+                &mut S,
+                relay_connect_request::Msg,
+                &ConnectedClients,
+            ) -> Option<RelayConnectResponse>
+            + Send
+            + Sync
+            + 'static,
+        I: Interceptor + Clone + Send + Sync + 'static,
+    {
         let handler = Arc::new(handler);
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -267,11 +284,14 @@ where
                     ServerTlsConfig::new().identity(TLS_MATERIAL.identity.clone()),
                 )
                 .unwrap()
-                .add_service(RelayServiceServer::new(RelayServiceHandler {
-                    state: state.clone(),
-                    clients: ConnectedClients::default(),
-                    handler,
-                }))
+                .add_service(RelayServiceServer::with_interceptor(
+                    RelayServiceHandler {
+                        state: state.clone(),
+                        clients: ConnectedClients::default(),
+                        handler,
+                    },
+                    interceptor,
+                ))
                 .serve_with_incoming_shutdown(
                     TcpListenerStream::new(listener),
                     async move {
