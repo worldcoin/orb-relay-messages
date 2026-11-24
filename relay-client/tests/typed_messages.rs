@@ -16,7 +16,7 @@ use tokio::time::timeout;
 
 fn options(endpoint: String, retries: u64) -> ClientOpts {
     ClientOpts::entity(EntityType::Orb)
-        .id("orb")
+        .src_id("orb")
         .namespace("test")
         .endpoint(endpoint)
         .auth(Auth::Token(Default::default()))

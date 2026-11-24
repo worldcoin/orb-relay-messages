@@ -5,7 +5,7 @@ use secrecy::SecretString;
 #[tokio::test]
 async fn plain_http_is_rejected() {
     let opts = ClientOpts::entity(EntityType::App)
-        .id("client")
+        .src_id("client")
         .namespace("default")
         .endpoint("http://127.0.0.1:1")
         .auth(Auth::Token(SecretString::new("token".into())))

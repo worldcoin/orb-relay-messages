@@ -28,7 +28,7 @@ async fn it_sends_heartbeat_periodically() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))

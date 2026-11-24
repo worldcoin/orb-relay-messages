@@ -430,6 +430,7 @@ async fn connect(
     let ClientOpts {
         endpoint: domain,
         auth,
+        src_id,
         client_id,
         namespace,
         entity_type,
@@ -446,7 +447,7 @@ async fn connect(
 
     let channel = endpoint.connect().await?;
 
-    // Pre-parse client_id for x-client-id header (Cloudflare rate limiting)
+    // Relay authentication and Cloudflare rate limiting use the header identity.
     let client_id_value = MetadataValue::try_from(client_id.as_str()).wrap_err(
         "Failed to convert client_id to metadata value (must be valid ASCII)",
     )?;
@@ -469,7 +470,7 @@ async fn connect(
         .send(RelayConnectRequest {
             msg: Some(relay_connect_request::Msg::ConnectRequest(ConnectRequest {
                 client_id: Some(Entity {
-                    id: client_id.clone(),
+                    id: src_id.clone(),
                     entity_type: *entity_type as i32,
                     namespace: namespace.clone(),
                 }),

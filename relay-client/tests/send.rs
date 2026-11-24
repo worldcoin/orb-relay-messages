@@ -34,7 +34,8 @@ async fn sends_at_most_once_and_increases_seq() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
+        .client_id("foo-client")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
@@ -133,7 +134,7 @@ async fn sends_at_least_once_retrying_until_ack_is_received() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))

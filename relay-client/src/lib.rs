@@ -158,7 +158,7 @@ impl RecvMessage {
         } else {
             let relay_payload = RelayPayload {
                 src: Some(Entity {
-                    id: self.client.opts.client_id.clone(),
+                    id: self.client.opts.src_id.clone(),
                     entity_type: self.client.opts.entity_type as i32,
                     namespace: self.client.opts.namespace.clone(),
                 }),
@@ -207,9 +207,8 @@ pub enum Err {
 /// ```ignore
 /// use orb_relay_client::{Client, ClientOpts};
 ///
-/// let opts = ClientOpts::entity()
-///     .entity_type(EntityType::Device)
-///     .id("device_1")
+/// let opts = ClientOpts::entity(EntityType::Orb)
+///     .src_id("orb_1")
 ///     .namespace("default")
 ///     .endpoint("https://relay.example.com")
 ///     .auth(Auth::Token("token123".into()))
@@ -230,14 +229,13 @@ pub struct Client {
 ///
 /// # Example
 /// ```ignore
-/// let opts = ClientOpts::entity()
-///     // Required fields:
-///     .entity_type(EntityType::Orb)
-///     .id("device_1")
+/// let opts = ClientOpts::entity(EntityType::Orb)
+///     .src_id("pairing_session_1")
 ///     .namespace("default")
 ///     .endpoint("https://relay.example.com")
-///     .auth(Auth::Token("token123".to_string()))
-///     // Optional fields (defaults provided):
+///     .auth(Auth::Token("token123".into()))
+///     // Optional fields
+///     .client_id("orb_1")
 ///     .connection_timeout(Duration::from_secs(30))
 ///     .max_connection_attempts(Amount::Infinite)
 ///     .ack_timeout(Duration::from_secs(20))
@@ -254,7 +252,14 @@ pub struct Client {
 pub struct ClientOpts {
     #[builder(start_fn)]
     entity_type: EntityType,
-    #[builder(setters(name = id))]
+    /// Relay address registered when opening the stream. Every outgoing message
+    /// carries this address in `RelayPayload.src.id` so peers can identify the
+    /// sender and route replies.
+    src_id: String,
+    /// Client identity sent in the `x-client-id` header when opening the gRPC
+    /// stream. Cloudflare can use it to rate-limit connection attempts, and the
+    /// relay uses it to verify Orb tokens. Defaults to `src_id`.
+    #[builder(default = src_id.clone())]
     client_id: String,
     namespace: String,
     endpoint: String,
@@ -289,12 +294,11 @@ impl Client {
     ///
     /// # Example
     /// ```ignore
-    /// let opts = ClientOpts::entity()
-    ///     .entity_type(EntityType::Orb)
-    ///     .id("device_1")
+    /// let opts = ClientOpts::entity(EntityType::Orb)
+    ///     .src_id("orb_1")
     ///     .namespace("default")
     ///     .endpoint("https://relay.example.com")
-    ///     .auth(Auth::Token("token123".to_string()))
+    ///     .auth(Auth::Token("token123".into()))
     ///     .build();
     ///
     /// let (client, handle) = Client::connect(opts);
@@ -473,7 +477,7 @@ pub(crate) fn relay_payload(
 ) -> RelayPayload {
     RelayPayload {
         src: Some(Entity {
-            id: opts.client_id.clone(),
+            id: opts.src_id.clone(),
             entity_type: opts.entity_type as i32,
             namespace: opts.namespace.clone(),
         }),

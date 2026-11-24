@@ -29,7 +29,7 @@ async fn it_stops_sever_when_stop_is_called() {
     .await;
 
     let opts = ClientOpts::entity(EntityType::App)
-        .id("foo")
+        .src_id("foo")
         .namespace("bar")
         .endpoint(format!("https://{}", sv.addr()))
         .auth(Auth::Token(Default::default()))
